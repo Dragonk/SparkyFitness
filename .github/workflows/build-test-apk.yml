@@ -13,15 +13,13 @@ name: Build Test APK
 # - uploads the APK as a GitHub Actions artifact.
 
 on:
-workflow_dispatch:
-inputs:
-ref:
-description: "Branch, tag or SHA to build"
-required: true
-default: "feat/mobile-custom-measurements"
-type: string
-
-```
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or SHA to build"
+        required: true
+        default: "feat/mobile-custom-measurements"
+        type: string
   app_variant:
     description: "App configuration"
     required: true
@@ -36,17 +34,12 @@ type: string
     required: false
     default: ""
     type: string
-```
-
 jobs:
 build:
 name: Build release APK
 runs-on: ubuntu-latest
-
-```
 permissions:
   contents: read
-
 env:
   NODE_ENV: production
   APP_VARIANT: ${{ inputs.app_variant }}
