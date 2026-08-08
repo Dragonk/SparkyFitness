@@ -1,0 +1,232 @@
+name: Build Test APK
+
+# Fork-only workflow (Dragonk/SparkyFitness).
+# Builds an installable Android RELEASE APK from a selected ref using a
+# temporary test signing key, and exposes it as a downloadable artifact.
+# No production signing secrets are used. Intended for manual/device testing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref (branch, tag, or SHA) to build'
+        required: false
+        default: 'feat/mobile-custom-measurements'
+      app_variant:
+        description: 'App variant (dev package can coexist with production)'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - production
+  # Initial workflow commit triggers one automatic PR1 build so no manual
+  # first click is needed. For this first run we always build PR1.
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/build-test-apk.yml
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Resolve target ref
+        id: ref
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BUILD_REF="${{ inputs.ref }}"
+          else
+            # First run triggered by the workflow-file push -> build PR1.
+            BUILD_REF="feat/mobile-custom-measurements"
+          fi
+          echo "ref=$BUILD_REF" >> "$GITHUB_OUTPUT"
+          echo "event=${{ github.event_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          # Fetch full history so the expected-SHA guard below is reliable.
+          fetch-depth: 0
+
+      - name: Print actual checkout SHA
+        id: sha
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "Checked out ref '${{ steps.ref.outputs.ref }}' at $ACTUAL_SHA"
+
+      # First automatic PR1 run must build exactly the reviewed PR1 HEAD.
+      # If the branch legitimately moved before this ran, fail loudly with the
+      # actual SHA instead of silently building a different revision.
+      - name: Guard PR1 first build SHA
+        if: steps.ref.outputs.event != 'workflow_dispatch' && steps.ref.outputs.ref == 'feat/mobile-custom-measurements'
+        run: |
+          EXPECTED_SHA="5a5d47b2be627c40d0ff1b3511c3f614289647d4"
+          ACTUAL_SHA="${{ steps.sha.outputs.sha }}"
+          if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::PR1 branch moved before the first build ran."
+            echo "::error::Expected $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "::error::Refusing to silently build a different revision."
+            exit 1
+          fi
+          echo "✅ PR1 HEAD verified: $ACTUAL_SHA"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          cd SparkyFitnessMobile
+          APP_VARIANT="${{ inputs.app_variant || 'dev' }}" npx expo prebuild --platform android
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make gradlew executable
+        run: chmod +x SparkyFitnessMobile/android/gradlew
+
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > SparkyFitnessMobile/android/local.properties
+
+      # Temporary test keystore — generated inside the runner, never committed,
+      # never reused for production. The APK is signed so it is installable.
+      - name: Generate temporary test keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/sparky-test.keystore" \
+            -alias sparky-test \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -storepass sparky-test-password \
+            -keypass sparky-test-password \
+            -dname "CN=SparkyFitness Test,O=Dragonk,C=PL"
+          echo "Test keystore created at $RUNNER_TEMP/sparky-test.keystore"
+
+      - name: Run Gradle to generate codegen (expected to fail; generates files)
+        run: |
+          cd SparkyFitnessMobile/android
+          ./gradlew :app:assembleDebug || true
+
+      - name: Verify codegen was generated
+        run: |
+          if [ -d "SparkyFitnessMobile/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/" ]; then
+            echo "✅ Codegen directory exists"
+            ls -la SparkyFitnessMobile/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/
+          else
+            echo "❌ Codegen directory NOT found — release build may still work"
+          fi
+
+      - name: Build Release APK
+        run: |
+          cd SparkyFitnessMobile/android
+          ./gradlew :app:assembleRelease \
+            -PMYAPP_RELEASE_STORE_FILE="$RUNNER_TEMP/sparky-test.keystore" \
+            -PMYAPP_RELEASE_KEY_ALIAS=sparky-test \
+            -PMYAPP_RELEASE_STORE_PASSWORD=sparky-test-password \
+            -PMYAPP_RELEASE_KEY_PASSWORD=sparky-test-password \
+            --stacktrace
+
+      - name: Locate and verify APK
+        id: apk
+        run: |
+          APK_PATH=$(find SparkyFitnessMobile/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [[ -z "$APK_PATH" ]]; then
+            echo "::error::No release APK found"
+            exit 1
+          fi
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "APK:"
+          ls -lh "$APK_PATH"
+          echo "SHA256:"
+          sha256sum "$APK_PATH"
+          # Optional verification; do not fail if apksigner is unavailable.
+          if command -v apksigner >/dev/null 2>&1; then
+            apksigner verify --verbose "$APK_PATH" || true
+          else
+            echo "apksigner not available — skipping signature verification"
+          fi
+
+      - name: Rename artifact
+        id: rename
+        run: |
+          APK_PATH="${{ steps.apk.outputs.path }}"
+          SHORT_SHA="${{ steps.sha.outputs.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          VARIANT="${{ inputs.app_variant || 'dev' }}"
+          if [[ "${{ steps.ref.outputs.ref }}" == "feat/mobile-custom-measurements" ]]; then
+            NEW_NAME="SparkyFitness-PR2061-${SHORT_SHA}-${VARIANT}-release.apk"
+          else
+            NEW_NAME="SparkyFitness-${SHORT_SHA}-${VARIANT}-release.apk"
+          fi
+          cp "$APK_PATH" "SparkyFitnessMobile/android/app/build/outputs/apk/release/$NEW_NAME"
+          echo "name=$NEW_NAME" >> "$GITHUB_OUTPUT"
+          echo "path=SparkyFitnessMobile/android/app/build/outputs/apk/release/$NEW_NAME" >> "$GITHUB_OUTPUT"
+          echo "Renamed APK: $NEW_NAME"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SparkyFitness-test-apk-${{ steps.sha.outputs.sha }}
+          path: ${{ steps.rename.outputs.path }}
+          retention-days: 14
+
+      - name: Write job summary
+        run: |
+          SHORT_SHA="${{ steps.sha.outputs.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          VARIANT="${{ inputs.app_variant || 'dev' }}"
+          if [[ "$VARIANT" == "dev" ]]; then
+            PKG="org.SparkyApps.SparkyFitnessMobile1.dev"
+          else
+            PKG="com.SparkyApps.SparkyFitnessMobile"
+          fi
+          SHA256=$(sha256sum "${{ steps.rename.outputs.path }}" | awk '{print $1}')
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## SparkyFitness Test APK
+
+          | Field | Value |
+          |---|---|
+          | Requested ref | \`${{ steps.ref.outputs.ref }}\` |
+          | Actual commit SHA | \`${{ steps.sha.outputs.sha }}\` |
+          | App variant | \`$VARIANT\` |
+          | Android package ID | \`$PKG\` |
+          | Build type | \`release\` |
+          | APK filename | \`${{ steps.rename.outputs.name }}\` |
+          | SHA256 | \`$SHA256\` |
+
+          **Notes:**
+          - APK is signed with a **temporary test keystore** generated inside this runner (not the production signing key).
+          - The \`dev\` variant uses package \`org.SparkyApps.SparkyFitnessMobile1.dev\` and can normally be installed **next to** the production SparkyFitness app.
+          - Artifact retention: 14 days.
+          EOF
