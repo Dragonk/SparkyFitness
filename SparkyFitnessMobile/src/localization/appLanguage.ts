@@ -51,12 +51,37 @@ async function hydratePreferences(): Promise<void> {
   const persist = useAppPreferencesStore.persist;
   if (persist.hasHydrated()) return;
 
-  await new Promise<void>((resolve) => {
+  // `onFinishHydration` resolves once Zustand finishes hydrating from storage.
+  // `rehydrate()` returns a Promise that may reject (storage failure, parse
+  // error, migration throw). The previous implementation ignored that rejection
+  // and never rejected the outer Promise, which could leave app bootstrap
+  // permanently pending and the splash screen stuck. Both paths now share one
+  // cleanup so the listener is always removed and the rejection propagates to
+  // `initializeAppLanguage`, where the caller logs it and continues startup.
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
     const unsubscribe = persist.onFinishHydration(() => {
+      if (settled) return;
+      settled = true;
       unsubscribe();
       resolve();
     });
-    void persist.rehydrate();
+    try {
+      const result = persist.rehydrate();
+      if (result && typeof result.then === 'function') {
+        result.catch((error: unknown) => {
+          if (settled) return;
+          settled = true;
+          unsubscribe();
+          reject(error);
+        });
+      }
+    } catch (error) {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      reject(error);
+    }
   });
 }
 
