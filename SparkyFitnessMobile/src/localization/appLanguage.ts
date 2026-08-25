@@ -51,38 +51,22 @@ async function hydratePreferences(): Promise<void> {
   const persist = useAppPreferencesStore.persist;
   if (persist.hasHydrated()) return;
 
-  // `onFinishHydration` resolves once Zustand finishes hydrating from storage.
-  // `rehydrate()` returns a Promise that may reject (storage failure, parse
-  // error, migration throw). The previous implementation ignored that rejection
-  // and never rejected the outer Promise, which could leave app bootstrap
-  // permanently pending and the splash screen stuck. Both paths now share one
-  // cleanup so the listener is always removed and the rejection propagates to
-  // `initializeAppLanguage`, where the caller logs it and continues startup.
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const unsubscribe = persist.onFinishHydration(() => {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      resolve();
-    });
-    try {
-      const result = persist.rehydrate();
-      if (result && typeof result.then === 'function') {
-        result.catch((error: unknown) => {
-          if (settled) return;
-          settled = true;
-          unsubscribe();
-          reject(error);
-        });
-      }
-    } catch (error) {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      reject(error);
-    }
-  });
+  // `persist.rehydrate()` returns a Promise that resolves once Zustand's
+  // internal hydrate() settles. In Zustand 5.0.x a storage/migration error is
+  // caught INTERNALLY by hydrate(): it calls the onRehydrateStorage callback
+  // with the error but does NOT re-throw, leaves `hasHydrated()` false, and
+  // never fires the `onFinishHydration` listeners. The previous implementation
+  // awaited an `onFinishHydration` Promise that would never fire on that path,
+  // leaving app bootstrap permanently pending behind the splash screen.
+  //
+  // The fix relies on the documented post-condition of `rehydrate()`: after
+  // it settles, `hasHydrated()` is true iff hydration succeeded. A false value
+  // means the store could not be hydrated and startup must not continue.
+  await persist.rehydrate();
+
+  if (!persist.hasHydrated()) {
+    throw new Error('Failed to hydrate app preferences');
+  }
 }
 
 async function applyEffectiveLanguage(language: SupportedLanguage): Promise<SupportedLanguage> {

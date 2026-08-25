@@ -2,14 +2,16 @@
  * Regression tests for the Zustand persist hydration wait inside
  * `initializeAppLanguage` / `syncAppLanguageFromSystem` (issue #2253).
  *
- * The previous implementation created a Promise that was resolved by
- * `persist.onFinishHydration` but never rejected: if `persist.rehydrate()`
- * threw or its Promise rejected (storage failure, parse error, migration
- * throw), `onFinishHydration` never fired and the Promise hung forever,
- * leaving app bootstrap stuck behind a permanent splash screen.
+ * The previous implementation awaited a Promise that was only resolved by
+ * `persist.onFinishHydration` and never rejected. In Zustand 5.0.x a
+ * storage/migration error is caught INTERNALLY by `hydrate()`: it does NOT
+ * re-throw, leaves `hasHydrated()` false, and never fires the
+ * `onFinishHydration` listeners — so the old Promise hung forever and app
+ * bootstrap stayed stuck behind a permanent splash screen.
  *
- * These tests mock the persist surface of `useAppPreferencesStore` so we can
- * exercise each terminal state of the wait without depending on real storage.
+ * The fix relies on the documented post-condition of `rehydrate()`: after it
+ * settles, `hasHydrated()` is true iff hydration succeeded. These tests mock
+ * the persist surface to exercise each terminal state without real storage.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,75 +49,59 @@ const mockPersist = () => useAppPreferencesStore.persist;
 
 /**
  * Replaces the persist API surface with a controllable double so each test
- * can decide how `rehydrate()` and `onFinishHydration()` behave. Returns
- * handles for assertions and manual triggers.
+ * can decide how `rehydrate()` behaves and what `hasHydrated()` reports after
+ * it settles. This mirrors the two real Zustand 5.0.x outcomes:
+ *
+ *  - success: `rehydrate()` resolves and `hasHydrated()` becomes true.
+ *  - internal failure: `rehydrate()` resolves (does NOT reject) but
+ *    `hasHydrated()` stays false because hydrate() caught the error itself.
+ *
+ * An explicit rejection path is also supported for defensive coverage.
  */
-function instrumentPersist(options?: {
-  hasHydrated?: boolean;
-  rehydrateImpl?: () => Promise<void> | void;
+function instrumentPersist(options: {
+  initialHasHydrated?: boolean;
+  /** Sets `hasHydrated()` to this value after `rehydrate()` settles. */
+  hasHydratedAfter?: boolean;
+  /** If provided, `rehydrate()` rejects with this error instead of resolving. */
+  rehydrateRejectsWith?: Error;
 }) {
   const calls = {
     rehydrate: 0,
-    onFinishHydration: 0,
-    unsubscribed: 0,
   };
 
   const persistApi = mockPersist();
-
   const originalHasHydrated = persistApi.hasHydrated.bind(persistApi);
   const originalRehydrate = persistApi.rehydrate.bind(persistApi);
-  const originalOnFinishHydration = persistApi.onFinishHydration.bind(persistApi);
 
-  // Force `hasHydrated()` to return false so the wait code path runs.
-  persistApi.hasHydrated = () => false;
+  let hydratedFlag = options.initialHasHydrated ?? false;
 
-  // Replace rehydrate with either the test-provided impl or the original.
-  persistApi.rehydrate = options?.rehydrateImpl
-    ? () => {
-        calls.rehydrate++;
-        return options.rehydrateImpl!();
-      }
-    : () => {
-        calls.rehydrate++;
-        return originalRehydrate();
-      };
+  persistApi.hasHydrated = () => hydratedFlag;
 
-  let activeListener: (() => void) | null = null;
-  persistApi.onFinishHydration = ((fn: () => void) => {
-    calls.onFinishHydration++;
-    activeListener = fn;
-    return () => {
-      calls.unsubscribed++;
-      activeListener = null;
-    };
-  }) as typeof persistApi.onFinishHydration;
+  persistApi.rehydrate = () => {
+    calls.rehydrate++;
+    if (options.rehydrateRejectsWith) {
+      return Promise.reject(options.rehydrateRejectsWith);
+    }
+    // Simulate the async settle: after the microtask, flip hasHydrated to the
+    // post-condition value (false on internal failure, true on success).
+    return new Promise<void>((resolve) => {
+      // Zustand resolves rehydrate() after its internal .then chain settles;
+      // flip the flag on the next microtask so the await sees the final value.
+      Promise.resolve().then(() => {
+        hydratedFlag = options.hasHydratedAfter ?? true;
+        resolve();
+      });
+    });
+  };
 
   return {
     calls,
-    /** Manually fire the active onFinishHydration listener (simulates hydration completing). */
-    fireHydration: () => {
-      if (activeListener) activeListener();
-    },
-    /** Whether a listener is currently registered. */
-    hasListener: () => activeListener !== null,
     restore() {
       persistApi.hasHydrated = originalHasHydrated;
       persistApi.rehydrate = originalRehydrate;
-      persistApi.onFinishHydration = originalOnFinishHydration;
-      activeListener = null;
+      hydratedFlag = false;
     },
   };
-}
-
-/**
- * Wait a few microtask ticks so the serialized language operation chain in
- * `initializeAppLanguage` can progress to the point where `hydratePreferences`
- * has registered its `onFinishHydration` listener. `initializeAppLanguage`
- * chains on `languageOperation` (initially `Promise.resolve()`), so the
- * listener is registered after at least one microtask tick.
- */
-function flushMicrotasks(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('hydratePreferences / initializeAppLanguage hydration wait (issue #2253)', () => {
@@ -128,114 +114,72 @@ describe('hydratePreferences / initializeAppLanguage hydration wait (issue #2253
     await i18n.changeLanguage('en');
   });
 
-  it('resolves when onFinishHydration fires after a successful manual rehydrate', async () => {
+  it('1. already hydrated: rehydrate() is not called and init continues', async () => {
+    // The store is already hydrated, so hydratePreferences() must short-circuit
+    // without touching rehydrate(). This mirrors the common path where the
+    // persist middleware auto-hydrated before initializeAppLanguage runs.
+    const inst = instrumentPersist({ initialHasHydrated: true });
+
+    await expect(initializeAppLanguage()).resolves.toBe('en');
+    expect(inst.calls.rehydrate).toBe(0);
+
+    inst.restore();
+  });
+
+  it('2. successful hydration: rehydrate() resolves and hasHydrated becomes true', async () => {
     const inst = instrumentPersist({
-      rehydrateImpl: () => Promise.resolve(),
+      initialHasHydrated: false,
+      hasHydratedAfter: true,
     });
 
-    const promise = initializeAppLanguage();
-
-    // Let the serialized operation chain run up to hydratePreferences.
-    await flushMicrotasks();
-
-    // The listener is now registered before we trigger completion.
-    expect(inst.hasListener()).toBe(true);
-
-    // Simulate Zustand finishing hydration.
-    inst.fireHydration();
-
-    await expect(promise).resolves.toBe('en');
+    await expect(initializeAppLanguage()).resolves.toBe('en');
     expect(inst.calls.rehydrate).toBe(1);
-    expect(inst.calls.onFinishHydration).toBe(1);
-    expect(inst.calls.unsubscribed).toBe(1);
-    expect(inst.hasListener()).toBe(false);
+    expect(useAppPreferencesStore.persist.hasHydrated()).toBe(true);
 
     inst.restore();
   });
 
-  it('rejects when rehydrate() returns a rejected Promise (no permanent hang)', async () => {
+  it('3. Zustand internal failure: rehydrate() RESOLVES but hasHydrated stays false → init rejects (no permanent hang)', async () => {
+    // This is the MOST IMPORTANT test. In Zustand 5.0.x a storage/migration
+    // error is caught internally by hydrate(): rehydrate() resolves, but
+    // hasHydrated() stays false and onFinishHydration never fires. The old
+    // implementation would hang forever here; the fix detects the false
+    // hasHydrated() and rejects so bootstrap can continue.
     const inst = instrumentPersist({
-      rehydrateImpl: () => Promise.reject(new Error('storage corrupted')),
+      initialHasHydrated: false,
+      hasHydratedAfter: false, // internal failure: stays false
     });
 
-    const promise = initializeAppLanguage();
-
-    await expect(promise).rejects.toThrow('storage corrupted');
-
-    // The listener was cleaned up even on the rejection path.
-    expect(inst.calls.unsubscribed).toBe(1);
-    expect(inst.hasListener()).toBe(false);
+    await expect(initializeAppLanguage()).rejects.toThrow('Failed to hydrate app preferences');
     expect(inst.calls.rehydrate).toBe(1);
 
     inst.restore();
   });
 
-  it('rejects when rehydrate() throws synchronously (no permanent hang)', async () => {
+  it('4. defensive external rejection: rehydrate() rejects → rejection propagates (no hang)', async () => {
+    // Zustand 5.0.x does not normally reject rehydrate() on storage errors, but
+    // the await path must still propagate a rejection if it ever occurs.
     const inst = instrumentPersist({
-      rehydrateImpl: () => {
-        throw new Error('sync boom');
-      },
+      initialHasHydrated: false,
+      rehydrateRejectsWith: new Error('storage corrupted'),
     });
 
-    const promise = initializeAppLanguage();
-
-    await expect(promise).rejects.toThrow('sync boom');
-    expect(inst.calls.unsubscribed).toBe(1);
-    expect(inst.hasListener()).toBe(false);
+    await expect(initializeAppLanguage()).rejects.toThrow('storage corrupted');
+    expect(inst.calls.rehydrate).toBe(1);
 
     inst.restore();
   });
 
-  it('does not leave the listener registered after a successful hydration', async () => {
+  it('5. bootstrap is never permanently pending: the Zustand-internal failure settles within the same tick', async () => {
     const inst = instrumentPersist({
-      rehydrateImpl: () => Promise.resolve(),
-    });
-
-    const promise = initializeAppLanguage();
-    await flushMicrotasks();
-    inst.fireHydration();
-    await promise;
-
-    // After success there must be no dangling listener.
-    expect(inst.hasListener()).toBe(false);
-    expect(inst.calls.unsubscribed).toBe(1);
-
-    inst.restore();
-  });
-
-  it('does not double-resolve if onFinishHydration fires after rehydrate already rejected', async () => {
-    let rejectFn: ((err: Error) => void) | null = null;
-    const inst = instrumentPersist({
-      rehydrateImpl: () =>
-        new Promise<void>((_resolve, reject) => {
-          rejectFn = reject;
-        }),
-    });
-
-    const promise = initializeAppLanguage();
-    await flushMicrotasks();
-    expect(inst.hasListener()).toBe(true);
-
-    // Reject rehydrate first.
-    rejectFn!(new Error('rehydrate failed'));
-    await expect(promise).rejects.toThrow('rehydrate failed');
-
-    // Late hydration event must NOT throw or resolve an already-settled promise.
-    expect(() => inst.fireHydration()).not.toThrow();
-    expect(inst.hasListener()).toBe(false);
-
-    inst.restore();
-  });
-
-  it('bootstrap is never permanently pending: a rehydrate rejection propagates within the same tick', async () => {
-    const inst = instrumentPersist({
-      rehydrateImpl: () => Promise.reject(new Error('migration threw')),
+      initialHasHydrated: false,
+      hasHydratedAfter: false,
     });
 
     const start = Date.now();
     const promise = initializeAppLanguage();
 
-    await expect(promise).rejects.toThrow('migration threw');
+    await expect(promise).rejects.toThrow('Failed to hydrate app preferences');
     const elapsed = Date.now() - start;
 
     // Must settle in well under 5s; the old implementation would hang forever.
