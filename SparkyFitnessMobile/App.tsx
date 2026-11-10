@@ -42,6 +42,9 @@ import FoodsLibraryScreen from './src/screens/FoodsLibraryScreen';
 import MealsLibraryScreen from './src/screens/MealsLibraryScreen';
 import ExercisesLibraryScreen from './src/screens/ExercisesLibraryScreen';
 import WorkoutPresetsLibraryScreen from './src/screens/WorkoutPresetsLibraryScreen';
+import WorkoutPlansLibraryScreen from './src/screens/WorkoutPlansLibraryScreen';
+import WorkoutPlanDetailScreen from './src/screens/WorkoutPlanDetailScreen';
+import WorkoutPlanFormScreen from './src/screens/WorkoutPlanFormScreen';
 import FoodDetailScreen from './src/screens/FoodDetailScreen';
 import MealDetailScreen from './src/screens/MealDetailScreen';
 import ExerciseDetailScreen from './src/screens/ExerciseDetailScreen';
@@ -197,6 +200,9 @@ const SafeFoodsLibrary = withErrorBoundary(FoodsLibraryScreen, 'FoodsLibrary', {
 const SafeMealsLibrary = withErrorBoundary(MealsLibraryScreen, 'MealsLibrary', { canGoBack: true });
 const SafeExercisesLibrary = withErrorBoundary(ExercisesLibraryScreen, 'ExercisesLibrary', { canGoBack: true });
 const SafeWorkoutPresetsLibrary = withErrorBoundary(WorkoutPresetsLibraryScreen, 'WorkoutPresetsLibrary', { canGoBack: true });
+const SafeWorkoutPlansLibrary = withErrorBoundary(WorkoutPlansLibraryScreen, 'WorkoutPlansLibrary', { canGoBack: true });
+const SafeWorkoutPlanDetail = withErrorBoundary(WorkoutPlanDetailScreen, 'WorkoutPlanDetail', { canGoBack: true });
+const SafeWorkoutPlanForm = withErrorBoundary(WorkoutPlanFormScreen, 'WorkoutPlanForm', { canGoBack: true });
 const SafeFoodDetail = withErrorBoundary(FoodDetailScreen, 'FoodDetail', { canGoBack: true });
 const SafeMealDetail = withErrorBoundary(MealDetailScreen, 'MealDetail', { canGoBack: true });
 const SafeExerciseDetail = withErrorBoundary(ExerciseDetailScreen, 'ExerciseDetail', { canGoBack: true });
@@ -909,6 +915,21 @@ function AppContent() {
             name="WorkoutPresetsLibrary"
             component={SafeWorkoutPresetsLibrary}
             options={createStackScreenOptions('Workout Presets', { headerBackTitle: 'Library' })}
+          />
+          <Stack.Screen
+            name="WorkoutPlansLibrary"
+            component={SafeWorkoutPlansLibrary}
+            options={createStackScreenOptions('Workout Plans', { headerBackTitle: 'Library' })}
+          />
+          <Stack.Screen
+            name="WorkoutPlanDetail"
+            component={SafeWorkoutPlanDetail}
+            options={({ route }) => createStackScreenOptions(route.params.plan.plan_name, { headerBackTitle: 'Plans' })}
+          />
+          <Stack.Screen
+            name="WorkoutPlanForm"
+            component={SafeWorkoutPlanForm}
+            options={({ route }) => createStackScreenOptions(route.params.mode === 'edit-plan' ? 'Edit Plan' : 'New Plan', { headerBackTitle: 'Plans' })}
           />
           <Stack.Screen
             name="WorkoutPresetDetail"

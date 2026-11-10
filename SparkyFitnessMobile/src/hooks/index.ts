@@ -112,6 +112,13 @@ export { useWorkoutPresets } from './useWorkoutPresets';
 export { useWorkoutPresetSearch } from './useWorkoutPresetSearch';
 export { useWorkoutPresetsLibrary } from './useWorkoutPresetsLibrary';
 export {
+  useWorkoutPlans,
+  useWorkoutPlan,
+  useCreateWorkoutPlan,
+  useUpdateWorkoutPlan,
+  useDeleteWorkoutPlan,
+} from './useWorkoutPlans';
+export {
   useCreateWorkoutPreset,
   useUpdateWorkoutPreset,
   useDeleteWorkoutPreset,

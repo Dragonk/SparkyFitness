@@ -314,6 +314,14 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
               <Icon name="chevron-forward" size={20} color="#999" />
             </View>
           </Pressable>
+          <Pressable
+            className="px-4 py-4 flex-row items-center justify-between border-t border-border-subtle"
+            onPress={() => navigation.navigate('WorkoutPlansLibrary')}
+            style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
+          >
+            <Text className="text-base font-semibold text-text-primary">Workout plans</Text>
+            <Icon name="chevron-forward" size={20} color="#999" />
+          </Pressable>
         </View>
 
         <View className="mb-3">

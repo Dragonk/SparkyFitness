@@ -44,6 +44,11 @@ export type RootStackParamList = {
   MealsLibrary: undefined;
   ExercisesLibrary: undefined;
   WorkoutPresetsLibrary: undefined;
+  WorkoutPlansLibrary: undefined;
+  WorkoutPlanDetail: { planId: number; plan: import('./workoutPlans').WorkoutPlanTemplate };
+  WorkoutPlanForm:
+    | { mode: 'create-plan' }
+    | { mode: 'edit-plan'; plan: import('./workoutPlans').WorkoutPlanTemplate };
   WorkoutPresetDetail: { preset: WorkoutPreset; updatedPreset?: WorkoutPreset };
   WorkoutPresetForm:
     | { mode: 'create-preset'; sourceSession?: PresetSessionResponse; selectedExercise?: Exercise; selectionNonce?: number }
