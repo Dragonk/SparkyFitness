@@ -136,6 +136,35 @@ export const deleteExercisePresetEntry = async (
   });
 };
 
+export interface WorkoutSourceUpdatePreview {
+  target: 'preset' | 'plan-day' | null;
+  differs: boolean;
+  name: string | null;
+}
+
+export const previewWorkoutSourceUpdate = async (
+  presetEntryId: string
+): Promise<WorkoutSourceUpdatePreview> => {
+  return apiCall(`/exercise-preset-entries/${presetEntryId}/source-update`, {
+    method: 'GET',
+  });
+};
+
+export const applyWorkoutSourceUpdate = async (
+  presetEntryId: string,
+  target: 'preset' | 'plan-day'
+): Promise<{
+  ok: boolean;
+  target: string;
+  regeneratedTemplateIds: number[];
+}> => {
+  return apiCall(`/exercise-preset-entries/${presetEntryId}/source-update`, {
+    method: 'POST',
+    body: JSON.stringify({ target }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+};
+
 export const transitionWorkoutSession = async (
   presetEntryId: string,
   payload: WorkoutSessionTransitionRequest

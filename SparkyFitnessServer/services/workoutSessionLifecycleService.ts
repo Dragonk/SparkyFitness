@@ -108,8 +108,8 @@ export async function transitionWorkoutSession(
       }
       idx += 1;
     }
-    setClauses.push(`revision = revision + 1`);
-    setClauses.push(`updated_at = now()`);
+    setClauses.push('revision = revision + 1');
+    setClauses.push('updated_at = now()');
     values.push(presetEntryId, userId);
 
     await client.query(

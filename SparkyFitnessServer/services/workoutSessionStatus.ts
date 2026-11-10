@@ -46,7 +46,7 @@ export function deriveSessionStatus(session: any): WorkoutSessionStatus {
     }
     const allCompleted = trackable.every(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (set: any) => set.completed_at != null
+      (set: any) => set.completed_at !== null && set.completed_at !== undefined
     );
     return allCompleted ? 'completed' : 'partial';
   }

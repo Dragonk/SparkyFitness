@@ -1,5 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import Animated, {
@@ -24,7 +24,11 @@ import { workoutSessionQueryKey } from '../hooks/queryKeys';
 import { useExerciseImageSource } from '../hooks/useExerciseImageSource';
 import { useNavigationActionGuard } from '../hooks/useNavigationActionGuard';
 import { usePreferences } from '../hooks/usePreferences';
-import { getWorkout } from '../services/api/exerciseApi';
+import {
+  getWorkout,
+  previewWorkoutSourceUpdate,
+  applyWorkoutSourceUpdate,
+} from '../services/api/exerciseApi';
 import { fireSuccessHaptic } from '../services/haptics';
 import { withAlpha } from '../utils/colors';
 import { distanceFromKm, weightFromKg } from '../utils/unitConversions';
@@ -259,6 +263,41 @@ function WorkoutCompleteScreen({ navigation, route }: Props) {
   const { runNavigationAction } = useNavigationActionGuard(navigation);
 
   const prColor = String(useCSSVariable('--color-pr'));
+
+  // After a Workout Plan session is finished, offer to update its source
+  // (preset or plan day) when the performed workout differs from it.
+  const sourcePromptShownRef = useRef(false);
+  useEffect(() => {
+    if (sourcePromptShownRef.current) return;
+    if (session.source !== 'Workout Plan') return;
+    sourcePromptShownRef.current = true;
+    void (async () => {
+      try {
+        const preview = await previewWorkoutSourceUpdate(session.id);
+        if (!preview.target || !preview.differs) return;
+        const isPreset = preview.target === 'preset';
+        Alert.alert(
+          isPreset ? 'Update preset?' : 'Update workout plan?',
+          isPreset
+            ? `Today's workout differs from "${preview.name ?? ''}". Update the preset to match? Only future planned sessions are refreshed.`
+            : `Today's workout differs from "${preview.name ?? ''}". Update this day's exercises in the plan? Only future planned sessions are refreshed.`,
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Update',
+              onPress: () => {
+                void applyWorkoutSourceUpdate(session.id, preview.target as 'preset' | 'plan-day').catch(() => {
+                  Alert.alert('Update failed', 'Please try again.');
+                });
+              },
+            },
+          ],
+        );
+      } catch {
+        // Preview is best-effort; the workout is already saved.
+      }
+    })();
+  }, [session.id, session.source]);
 
   const summary = useMemo(
     () => buildWorkoutCompletionSummary(session, completedSetIds, prSetIds),

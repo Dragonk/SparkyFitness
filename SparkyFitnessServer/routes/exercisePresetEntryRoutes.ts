@@ -9,6 +9,10 @@ import {
 import exercisePresetEntryRepository from '../models/exercisePresetEntryRepository.js';
 import exerciseService from '../services/exerciseService.js';
 import { transitionWorkoutSession } from '../services/workoutSessionLifecycleService.js';
+import {
+  previewSourceUpdate,
+  applySourceUpdate,
+} from '../services/workoutSourceUpdateService.js';
 import { log } from '../config/logging.js';
 const router = express.Router();
 const presetEntryIdParamSchema = z.object({
@@ -251,6 +255,93 @@ router.post('/:id/transition', isAuthenticated, async (req, res, next) => {
       `Error transitioning grouped workout session ${req.params.id}:`,
       error
     );
+    handleRouteError(error, res, next);
+  }
+});
+/**
+ * @swagger
+ * /exercise-preset-entries/{id}/source-update:
+ *   get:
+ *     summary: Preview whether a finished plan session differs from its source
+ *     tags: [Fitness & Workouts]
+ *     description: For Workout Plan sessions, reports whether the performed workout differs from the source (Workout Preset or plan-day assignment) and which target would be updated.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Preview result with target ('preset' | 'plan-day' | null), differs flag, and source name.
+ *       401:
+ *         description: Unauthorized.
+ *       404:
+ *         description: Grouped workout session not found.
+ */
+router.get('/:id/source-update', isAuthenticated, async (req, res, next) => {
+  try {
+    const parsedParams = presetEntryIdParamSchema.safeParse(req.params);
+    if (!parsedParams.success) {
+      return sendValidationError(
+        res,
+        'Invalid grouped workout id.',
+        parsedParams.error
+      );
+    }
+    const preview = await previewSourceUpdate(req.userId, parsedParams.data.id);
+    res.status(200).json(preview);
+  } catch (error) {
+    log('error', `Error previewing source update for ${req.params.id}:`, error);
+    handleRouteError(error, res, next);
+  }
+});
+/**
+ * @swagger
+ * /exercise-preset-entries/{id}/source-update:
+ *   post:
+ *     summary: Update the workout source (preset or plan day) from a finished session
+ *     tags: [Fitness & Workouts]
+ *     description: Applies the performed workout to its Workout Plan source. Execution-only data (completion timestamps, PR flags, calories) is never copied. Only future untouched planned sessions are regenerated; past/completed/partial sessions are never modified.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Source updated successfully.
+ *       400:
+ *         description: Invalid payload.
+ *       401:
+ *         description: Unauthorized.
+ *       404:
+ *         description: Grouped workout session not found.
+ *       409:
+ *         description: Session is not a finished Workout Plan session.
+ */
+router.post('/:id/source-update', isAuthenticated, async (req, res, next) => {
+  try {
+    const parsedParams = presetEntryIdParamSchema.safeParse(req.params);
+    if (!parsedParams.success) {
+      return sendValidationError(
+        res,
+        'Invalid grouped workout id.',
+        parsedParams.error
+      );
+    }
+    const parsedBody = z
+      .object({ target: z.enum(['preset', 'plan-day']) })
+      .strict()
+      .safeParse(req.body);
+    if (!parsedBody.success) {
+      return sendValidationError(
+        res,
+        'Invalid source update payload.',
+        parsedBody.error
+      );
+    }
+    const result = await applySourceUpdate(
+      req.userId,
+      parsedParams.data.id,
+      parsedBody.data.target
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    log('error', `Error applying source update for ${req.params.id}:`, error);
     handleRouteError(error, res, next);
   }
 });

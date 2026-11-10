@@ -469,3 +469,32 @@ export const deleteExerciseFromLibrary = async (id: string): Promise<void> => {
     method: 'DELETE',
   });
 };
+
+export interface WorkoutSourceUpdatePreview {
+  target: 'preset' | 'plan-day' | null;
+  differs: boolean;
+  name: string | null;
+}
+
+export const previewWorkoutSourceUpdate = async (
+  id: string,
+): Promise<WorkoutSourceUpdatePreview> => {
+  return apiFetch<WorkoutSourceUpdatePreview>({
+    endpoint: `/api/exercise-preset-entries/${id}/source-update`,
+    serviceName: 'Exercise API',
+    operation: 'preview workout source update',
+  });
+};
+
+export const applyWorkoutSourceUpdate = async (
+  id: string,
+  target: 'preset' | 'plan-day',
+): Promise<{ ok: boolean; target: string; regeneratedTemplateIds: number[] }> => {
+  return apiFetch({
+    endpoint: `/api/exercise-preset-entries/${id}/source-update`,
+    serviceName: 'Exercise API',
+    operation: 'apply workout source update',
+    method: 'POST',
+    body: { target },
+  });
+};

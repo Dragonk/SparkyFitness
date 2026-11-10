@@ -14,6 +14,9 @@ import {
   logWorkoutPreset,
   deleteExercisePresetEntry,
   transitionWorkoutSession,
+  previewWorkoutSourceUpdate,
+  applyWorkoutSourceUpdate,
+  type WorkoutSourceUpdatePreview,
   fetchExerciseDetails,
   fetchExerciseEntryHistoryV2,
   getExerciseHistory,
@@ -237,6 +240,45 @@ export const useWorkoutSessionTransitionMutation = () => {
       ),
     },
   });
+};
+
+export const useWorkoutSourceUpdate = () => {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  const preview = useMutation({
+    mutationFn: (presetEntryId: string) =>
+      previewWorkoutSourceUpdate(presetEntryId),
+  });
+
+  const apply = useMutation({
+    mutationFn: (variables: {
+      presetEntryId: string;
+      target: 'preset' | 'plan-day';
+    }) => applyWorkoutSourceUpdate(variables.presetEntryId, variables.target),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: exerciseEntryKeys.all });
+      queryClient.invalidateQueries({ queryKey: dailyProgressKeys.all });
+    },
+    meta: {
+      successMessage: t(
+        'diary.exerciseEntry.sourceUpdateSuccess',
+        'Workout source updated. Future planned sessions were refreshed.'
+      ),
+      errorMessage: t(
+        'diary.exerciseEntry.sourceUpdateError',
+        'Failed to update the workout source.'
+      ),
+    },
+  });
+
+  return {
+    previewSourceUpdate: preview.mutateAsync,
+    isPreviewing: preview.isPending,
+    applySourceUpdate: apply.mutateAsync,
+    isApplying: apply.isPending,
+    previewResult: preview.data as WorkoutSourceUpdatePreview | undefined,
+  };
 };
 
 export const exerciseDetailsOptions = (exerciseId: string) => ({

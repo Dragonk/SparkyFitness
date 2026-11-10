@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import ExerciseEntryDisplay from './ExerciseEntryDisplay';
 import WorkoutSessionStatusBadge from '@/components/WorkoutSessionStatusBadge';
+import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
+import { useWorkoutSourceUpdate } from '@/hooks/Exercises/useExerciseEntries';
 import type { WorkoutSessionTransition } from '@workspace/shared';
 import { formatMinutesToHHMM } from '@/utils/timeFormatters';
 import { Exercise, ExerciseEntry, PresetSessionEntry } from '@/types/exercises';
@@ -70,10 +72,47 @@ const ExercisePresetEntryDisplay: React.FC<ExercisePresetEntryDisplayProps> = ({
 }) => {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isSourceDialogOpen, setIsSourceDialogOpen] = useState(false);
+  const {
+    previewSourceUpdate,
+    applySourceUpdate,
+    isPreviewing,
+    isApplying,
+    previewResult,
+  } = useWorkoutSourceUpdate();
 
   const toggleExpansion = useCallback(() => {
     setIsExpanded((prev) => !prev);
   }, []);
+
+  const isPlanSession = presetEntry.source === 'Workout Plan';
+  const canUpdateSource =
+    isPlanSession &&
+    (presetEntry.status === 'partial' || presetEntry.status === 'completed');
+
+  const handleUpdateSourceClick = useCallback(async () => {
+    try {
+      const preview = await previewSourceUpdate(presetEntry.id);
+      if (preview.target && preview.differs) {
+        setIsSourceDialogOpen(true);
+      }
+    } catch {
+      // meta errorMessage handles the toast
+    }
+  }, [presetEntry.id, previewSourceUpdate]);
+
+  const handleConfirmSourceUpdate = useCallback(async () => {
+    if (!previewResult?.target) return;
+    try {
+      await applySourceUpdate({
+        presetEntryId: presetEntry.id,
+        target: previewResult.target,
+      });
+      setIsSourceDialogOpen(false);
+    } catch {
+      // meta errorMessage handles the toast
+    }
+  }, [previewResult, presetEntry.id, applySourceUpdate]);
 
   const totalSets =
     presetEntry.exercises?.reduce(
@@ -288,6 +327,46 @@ const ExercisePresetEntryDisplay: React.FC<ExercisePresetEntryDisplayProps> = ({
           )}
         </div>
       </div>
+
+      {/* Update source after completion (Workout Plan sessions) */}
+      {canUpdateSource && (
+        <div className="px-4 pb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUpdateSourceClick}
+            disabled={isPreviewing || isApplying}
+            className="h-8 gap-1 text-xs"
+          >
+            <RotateCcw className="w-3 h-3" />
+            {t('workoutSessionActions.updateSource', 'Update source')}
+          </Button>
+        </div>
+      )}
+
+      <ConfirmationDialog
+        open={isSourceDialogOpen}
+        onOpenChange={setIsSourceDialogOpen}
+        onConfirm={handleConfirmSourceUpdate}
+        title={
+          previewResult?.target === 'preset'
+            ? t('workoutSessionActions.updatePresetTitle', 'Update preset?')
+            : t('workoutSessionActions.updatePlanTitle', 'Update workout plan?')
+        }
+        description={
+          previewResult?.target === 'preset'
+            ? t(
+                'workoutSessionActions.updatePresetDescription',
+                `Today's workout differs from "${previewResult?.name ?? ''}". Update the preset to match? Only future planned sessions are refreshed.`,
+                { name: previewResult?.name ?? '' }
+              )
+            : t(
+                'workoutSessionActions.updatePlanDescription',
+                `Today's workout differs from "${previewResult?.name ?? ''}". Update this day's exercises in the plan? Only future planned sessions are refreshed.`,
+                { name: previewResult?.name ?? '' }
+              )
+        }
+      />
 
       {/* Expanded exercise list */}
       {isExpanded && (
