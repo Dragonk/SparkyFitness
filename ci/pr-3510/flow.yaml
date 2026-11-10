@@ -1,0 +1,59 @@
+appId: ${APP_ID}
+name: PR 3510 session lifecycle screenshots
+---
+# First launch: enter the frontend URL that fronts the API.
+- launchApp:
+    appId: ${APP_ID}
+    clearState: true
+    autoGrantPermissions: true
+- extendedWaitUntil:
+    visible: "https://your-sparky-app.com"
+    timeout: 90000
+- screenshot: 01_onboarding
+- tapOn:
+    text: "https://your-sparky-app.com"
+- inputText: "https://10.0.2.2:8443"
+- hideKeyboard
+- tapOn: "Next"
+- extendedWaitUntil:
+    visible: "email@example.com"
+    timeout: 45000
+- screenshot: 02_sign_in
+- tapOn:
+    text: "email@example.com"
+- inputText: "demo@example.com"
+- tapOn:
+    text: "Password"
+- inputText: "SparkyDemo2026!"
+- hideKeyboard
+- tapOn: "Connect"
+- extendedWaitUntil:
+    visible: "Diary"
+    timeout: 90000
+- screenshot: 03_after_login
+# Diary: three sessions with their derived status pills.
+- tapOn:
+    text: "Diary"
+    index: 1
+- extendedWaitUntil:
+    visible: "Phase 1 Partial Workout"
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      text: "Phase 1 Partial Workout"
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 80
+- screenshot: 04_diary_status_pills
+# Detail: status badge and the Resume button on a partial session.
+- tapOn: "Phase 1 Partial Workout"
+- extendedWaitUntil:
+    visible: "Partial"
+    timeout: 45000
+- screenshot: 05_detail_partial
+- tapOn: "Resume Workout"
+- extendedWaitUntil:
+    visible: "Demo Goblet Squat"
+    timeout: 60000
+- screenshot: 06_active_workout_resumed
+
