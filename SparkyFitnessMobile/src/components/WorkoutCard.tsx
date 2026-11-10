@@ -5,6 +5,7 @@ import type { ExerciseSessionResponse } from '@workspace/shared';
 import Icon from './Icon';
 import SafeImage from './SafeImage';
 import { getWorkoutIcon, getSourceLabel, getWorkoutSummary, getFirstImage, buildSessionSubtitle } from '../utils/workoutSession';
+import WorkoutSessionStatusBadge from './WorkoutSessionStatusBadge';
 import type { GetImageSource } from '../hooks/useExerciseImageSource';
 
 interface WorkoutCardProps {
@@ -46,16 +47,21 @@ const WorkoutCard = React.memo<WorkoutCardProps>(({ session, getImageSource, wei
             <Text className="text-base font-semibold text-text-primary flex-1 mr-2" numberOfLines={1}>
               {name}
             </Text>
-            <View
-              className="rounded-full px-2 py-0.5"
-              style={{ backgroundColor: isSparky ? `${accentPrimary}20` : `${textMuted}20` }}
-            >
-              <Text
-                className="text-xs font-medium"
-                style={{ color: isSparky ? accentPrimary : textSecondary }}
+            <View className="flex-row items-center gap-2">
+              {session.type === 'preset' && session.status && (
+                <WorkoutSessionStatusBadge status={session.status} />
+              )}
+              <View
+                className="rounded-full px-2 py-0.5"
+                style={{ backgroundColor: isSparky ? `${accentPrimary}20` : `${textMuted}20` }}
               >
-                {sourceLabel}
-              </Text>
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: isSparky ? accentPrimary : textSecondary }}
+                >
+                  {sourceLabel}
+                </Text>
+              </View>
             </View>
           </View>
           <Text className="text-sm text-text-secondary mt-0.5">

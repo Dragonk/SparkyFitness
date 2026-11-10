@@ -16,6 +16,7 @@ import type {
   PresetSessionResponse,
   ExerciseEntryResponse,
   Pagination,
+  WorkoutSessionTransitionRequest,
 } from '@workspace/shared';
 
 export const fetchExerciseEntries = async (date: string): Promise<ExerciseSessionResponse[]> => {
@@ -385,6 +386,19 @@ export const updateWorkout = async (
     serviceName: 'Exercise API',
     operation: 'update workout',
     method: 'PUT',
+    body: payload,
+  });
+};
+
+export const transitionWorkoutSession = async (
+  id: string,
+  payload: WorkoutSessionTransitionRequest,
+): Promise<PresetSessionResponse> => {
+  return apiFetch<PresetSessionResponse>({
+    endpoint: `/api/exercise-preset-entries/${id}/transition`,
+    serviceName: 'Exercise API',
+    operation: 'transition workout session',
+    method: 'POST',
     body: payload,
   });
 };

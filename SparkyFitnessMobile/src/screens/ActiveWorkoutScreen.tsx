@@ -53,6 +53,7 @@ import WorkoutReorderList from '../components/WorkoutReorderList';
 import Button from '../components/ui/Button';
 import FormInput from '../components/FormInput';
 import { useActiveWorkoutAutosave } from '../hooks/useActiveWorkoutAutosave';
+import { useWorkoutSessionTransition } from '../hooks/useExerciseMutations';
 import { invalidateExerciseCache } from '../hooks/invalidateExerciseCache';
 import { useExerciseImageSource } from '../hooks/useExerciseImageSource';
 import { useNavigationActionGuard } from '../hooks/useNavigationActionGuard';
@@ -181,6 +182,7 @@ function ActiveWorkoutScreen({ navigation, route }: Props) {
   const distanceUnit = (preferences?.default_distance_unit as 'km' | 'miles') ?? 'km';
   const { getImageSource } = useExerciseImageSource();
   const { flush } = useActiveWorkoutAutosave();
+  const { transitionSessionAsync } = useWorkoutSessionTransition();
   const { runNavigationAction } = useNavigationActionGuard(navigation);
 
   // One 1s tick drives the elapsed clock and re-renders the rest countdown
@@ -879,6 +881,22 @@ function ActiveWorkoutScreen({ navigation, route }: Props) {
         );
         return;
       }
+      // Sets are saved; stamp the server-side lifecycle as ended so the
+      // session derives partial/completed instead of staying in_progress.
+      // Best-effort: a conflict here means another device owns the session,
+      // and the local finish must still proceed.
+      const finishedState = useActiveWorkoutStore.getState();
+      if (finishedState.sessionId) {
+        try {
+          await transitionSessionAsync({
+            id: finishedState.sessionId,
+            transition: 'end',
+            expectedRevision: finishedState.session?.revision,
+          });
+        } catch {
+          // Ignore: the set data is already persisted by the flush above.
+        }
+      }
       // The celebration screen renders entirely from this snapshot, so it must
       // be taken before clearWorkout. With zero completed sets there is
       // nothing to celebrate — finish exits straight back to the diary.
@@ -901,7 +919,7 @@ function ActiveWorkoutScreen({ navigation, route }: Props) {
       }
     }
     await attempt();
-  }, [flush, navigation]);
+  }, [flush, navigation, transitionSessionAsync]);
 
   // Long-gap guard on the way out: a workout left open across a long break
   // (forgotten overnight, one straggler set the next morning) would stamp the

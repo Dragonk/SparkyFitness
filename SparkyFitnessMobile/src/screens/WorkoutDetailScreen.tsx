@@ -32,7 +32,9 @@ import {
 import {
   useDeleteWorkout,
   useUpdateWorkout,
+  useWorkoutSessionTransition,
 } from '../hooks/useExerciseMutations';
+import WorkoutSessionStatusBadge from '../components/WorkoutSessionStatusBadge';
 import { promptForActiveWorkoutConflict } from '../hooks/useStartLiveWorkout';
 import { usePreferences } from '../hooks/usePreferences';
 import { useExerciseImageSource } from '../hooks/useExerciseImageSource';
@@ -270,6 +272,8 @@ const WorkoutDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Seed the store from this saved session and enter the live screen. `atSetId`
   // starts the cursor on a specific set (the "Start workout here" long-press).
+  const { transitionSessionAsync } = useWorkoutSessionTransition();
+
   const enterLiveWorkout = useCallback(
     (atSetId?: string) => {
       // Chained so the exact-alarm prompt never stacks on top of the OS
@@ -280,9 +284,19 @@ const WorkoutDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       const store = useActiveWorkoutStore.getState();
       if (atSetId != null) store.startWorkoutAtSet(session, atSetId);
       else store.startWorkout(session);
+      // Mark the session as started/resumed on the server so other devices
+      // see the in_progress status. Best-effort: the local workout works
+      // either way, and the finish flush re-syncs the session.
+      if (session.status === 'planned' || session.status === 'partial') {
+        void transitionSessionAsync({
+          id: session.id,
+          transition: session.status === 'partial' ? 'resume' : 'start',
+          expectedRevision: session.revision,
+        }).catch(() => {});
+      }
       navigation.replace('ActiveWorkout');
     },
-    [session, navigation],
+    [session, navigation, transitionSessionAsync],
   );
 
   // Start this workout, first resolving any other in-progress session through
@@ -662,6 +676,12 @@ const WorkoutDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           ) : null}
           <View className="flex-row items-center">
             <Text className="text-sm text-text-muted">{sourceLabel}</Text>
+            {session.status && (
+              <>
+                <Text className="text-sm text-text-muted mx-2">{'\u2022'}</Text>
+                <WorkoutSessionStatusBadge status={session.status} />
+              </>
+            )}
             <Text className="text-sm text-text-muted mx-2">{'\u2022'}</Text>
             {isEditing ? (
               <TouchableOpacity
@@ -683,10 +703,27 @@ const WorkoutDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Summary card */}
         {renderSummaryCard()}
 
-        {/* Start Workout button */}
-        {!isEditing && isSparky && !isWorkoutActive && (
+        {/* Start / Resume Workout button */}
+        {!isEditing && isSparky && !isWorkoutActive && session.status !== 'completed' && (
           <Button variant="primary" onPress={handleStartWorkout} className="mt-4">
-            Start Workout
+            {session.status === 'partial' ? 'Resume Workout' : 'Start Workout'}
+          </Button>
+        )}
+
+        {/* End Workout action for a session already in progress */}
+        {!isEditing && !isWorkoutActive && session.status === 'in_progress' && (
+          <Button
+            variant="secondary"
+            className="mt-2"
+            onPress={() => {
+              void transitionSessionAsync({
+                id: session.id,
+                transition: 'end',
+                expectedRevision: session.revision,
+              });
+            }}
+          >
+            End Workout
           </Button>
         )}
 

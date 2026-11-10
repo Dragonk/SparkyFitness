@@ -1,10 +1,15 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 import Toast from 'react-native-toast-message';
-import type { CreatePresetSessionRequest, UpdatePresetSessionRequest } from '@workspace/shared';
+import type {
+  CreatePresetSessionRequest,
+  UpdatePresetSessionRequest,
+  WorkoutSessionTransition,
+} from '@workspace/shared';
 import {
   createWorkout,
   updateWorkout,
+  transitionWorkoutSession,
   deleteWorkout as deleteWorkoutApi,
   createExerciseEntry,
   updateExerciseEntry,
@@ -143,6 +148,29 @@ export function useUpdateWorkout() {
     },
   });
   return { updateSession: mutate, ...rest };
+}
+
+export function useWorkoutSessionTransition() {
+  const { mutate: mutateAsync, ...rest } = useCrudMutation({
+    mutationFn: ({
+      id,
+      transition,
+      expectedRevision,
+    }: {
+      id: string;
+      transition: WorkoutSessionTransition;
+      expectedRevision?: number;
+    }) =>
+      transitionWorkoutSession(id, {
+        transition,
+        expected_revision: expectedRevision,
+      }),
+    errorTitle: 'Failed to update workout status',
+    onMutationSuccess: (updatedSession, queryClient) => {
+      syncExerciseSessionInCache(queryClient, updatedSession);
+    },
+  });
+  return { transitionSessionAsync: mutateAsync, ...rest };
 }
 
 export function useCreateExerciseEntry() {
