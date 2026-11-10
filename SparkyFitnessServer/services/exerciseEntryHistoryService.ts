@@ -14,6 +14,7 @@ import {
 
 import { getClient } from '../db/poolManager.js';
 import { log } from '../config/logging.js';
+import { attachSessionLifecycle } from './workoutSessionStatus.js';
 
 /** Convert a pg date value to a YYYY-MM-DD string, or return null. */
 function _dateToString(value: unknown): string | null {
@@ -237,7 +238,8 @@ async function getExerciseEntryHistorySessions(
     batchQueries.push(
       client
         .query(
-          `SELECT id, workout_preset_id, name, description, notes, source
+          `SELECT id, workout_preset_id, name, description, notes, source,
+                  started_at, last_activity_at, finished_at, revision
            FROM exercise_preset_entries WHERE id = ANY($1::uuid[])`,
           [presetIds]
         )
@@ -383,6 +385,7 @@ async function getExerciseEntryHistorySessions(
         description: (meta.description as string) ?? null,
         notes: (meta.notes as string) ?? null,
         source: meta.source as string,
+        ...attachSessionLifecycle(meta, children),
         total_duration_minutes: totalDuration,
         exercises: children,
         activity_details: presetDetails,
@@ -475,7 +478,8 @@ async function _getExerciseEntriesByDateWithClient(
   // Fetch preset entries and all exercise entries for the date in parallel
   const [presetResult, entriesResult] = await Promise.all([
     client.query(
-      `SELECT id, workout_preset_id, name, description, notes, source, created_at
+      `SELECT id, workout_preset_id, name, description, notes, source, created_at,
+              started_at, last_activity_at, finished_at, revision
        FROM exercise_preset_entries
        WHERE user_id = $1 AND entry_date = $2
        ORDER BY created_at ASC`,
@@ -661,6 +665,7 @@ async function _getExerciseEntriesByDateWithClient(
         description: (presetRow.description as string) ?? null,
         notes: (presetRow.notes as string) ?? null,
         source: presetRow.source as string,
+        ...attachSessionLifecycle(presetRow, children),
         total_duration_minutes: totalDuration,
         exercises: children,
         activity_details: presetDetails,
@@ -704,7 +709,8 @@ export async function getGroupedExerciseSessionByIdWithClient(
   presetEntryId: string
 ): Promise<PresetSessionResponse | null> {
   const metaResult = await client.query(
-    `SELECT id, workout_preset_id, name, description, notes, source, entry_date
+    `SELECT id, workout_preset_id, name, description, notes, source, entry_date,
+            started_at, last_activity_at, finished_at, revision
      FROM exercise_preset_entries
      WHERE user_id = $1 AND id = $2`,
     [targetUserId, presetEntryId]
@@ -781,6 +787,7 @@ export async function getGroupedExerciseSessionByIdWithClient(
     description: (meta.description as string) ?? null,
     notes: (meta.notes as string) ?? null,
     source: meta.source as string,
+    ...attachSessionLifecycle(meta, exercises),
     total_duration_minutes: exercises.reduce(
       (sum, exercise) => sum + (exercise.duration_minutes ?? 0),
       0

@@ -4,9 +4,11 @@ import {
   createPresetSessionRequestSchema,
   updatePresetSessionRequestSchema,
   presetSessionResponseSchema,
+  workoutSessionTransitionRequestSchema,
 } from '@workspace/shared';
 import exercisePresetEntryRepository from '../models/exercisePresetEntryRepository.js';
 import exerciseService from '../services/exerciseService.js';
+import { transitionWorkoutSession } from '../services/workoutSessionLifecycleService.js';
 import { log } from '../config/logging.js';
 const router = express.Router();
 const presetEntryIdParamSchema = z.object({
@@ -190,6 +192,63 @@ router.put('/:id', isAuthenticated, async (req, res, next) => {
     log(
       'error',
       `Error updating grouped workout session ${req.params.id}:`,
+      error
+    );
+    handleRouteError(error, res, next);
+  }
+});
+/**
+ * @swagger
+ * /exercise-preset-entries/{id}/transition:
+ *   post:
+ *     summary: Transition the lifecycle of a grouped workout session
+ *     tags: [Fitness & Workouts]
+ *     description: Applies a server-authoritative lifecycle transition (start, resume, end). The derived status (planned/in_progress/partial/completed) is computed from started_at/finished_at and per-set completed_at. An optional expected_revision guards against stale concurrent writes and returns 409 on mismatch.
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: The grouped workout session after the transition.
+ *       400:
+ *         description: Invalid transition payload.
+ *       401:
+ *         description: Unauthorized.
+ *       404:
+ *         description: Grouped workout session not found.
+ *       409:
+ *         description: Invalid transition for the current status, or revision conflict.
+ */
+router.post('/:id/transition', isAuthenticated, async (req, res, next) => {
+  try {
+    const parsedParams = presetEntryIdParamSchema.safeParse(req.params);
+    if (!parsedParams.success) {
+      return sendValidationError(
+        res,
+        'Invalid grouped workout id.',
+        parsedParams.error
+      );
+    }
+    const parsedBody = workoutSessionTransitionRequestSchema.safeParse(
+      req.body
+    );
+    if (!parsedBody.success) {
+      return sendValidationError(
+        res,
+        'Invalid lifecycle transition payload.',
+        parsedBody.error
+      );
+    }
+    const groupedWorkout = await transitionWorkoutSession(
+      req.userId,
+      parsedParams.data.id,
+      parsedBody.data
+    );
+    const response = presetSessionResponseSchema.parse(groupedWorkout);
+    res.status(200).json(response);
+  } catch (error) {
+    log(
+      'error',
+      `Error transitioning grouped workout session ${req.params.id}:`,
       error
     );
     handleRouteError(error, res, next);

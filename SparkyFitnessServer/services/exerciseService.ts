@@ -23,6 +23,7 @@ import {
   setsDistanceKm,
   setsDurationMinutes,
 } from '@workspace/shared';
+import { touchSessionOnMutation } from './workoutSessionLifecycleService.js';
 
 import papa from 'papaparse';
 import {
@@ -1925,6 +1926,18 @@ async function updateGroupedWorkoutSession(
     );
     if (!existingSession) {
       throw createServiceError(404, 'Exercise preset entry not found.');
+    }
+    const touched = await touchSessionOnMutation(
+      client,
+      userId,
+      presetEntryId,
+      updateData.expected_revision ?? null
+    );
+    if (!touched) {
+      throw createServiceError(
+        409,
+        `Revision conflict: session was modified elsewhere (expected revision ${updateData.expected_revision}, current differs).`
+      );
     }
     await exercisePresetEntryRepository.updateExercisePresetEntryWithClient(
       client,

@@ -171,6 +171,7 @@ export const updatePresetSessionRequestSchema = z
     notes: z.string().nullable().optional(),
     entry_date: dateStringSchema.optional(),
     exercises: z.array(presetSessionExerciseRequestSchema).min(1).optional(),
+    expected_revision: z.number().int().min(0).optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -260,6 +261,21 @@ export const individualSessionResponseSchema =
     name: z.string().nullable(),
   });
 
+/** Server-backed lifecycle status of a grouped workout session */
+export const workoutSessionStatusSchema = z.enum([
+  "planned",
+  "in_progress",
+  "partial",
+  "completed",
+]);
+
+/** Lifecycle transitions a client can request; the server stays authoritative */
+export const workoutSessionTransitionSchema = z.enum([
+  "start",
+  "resume",
+  "end",
+]);
+
 /** Grouped workout session with nested exercise entries */
 export const presetSessionResponseSchema = z
   .object({
@@ -272,10 +288,23 @@ export const presetSessionResponseSchema = z
     notes: z.string().nullable(),
     source: z.string(),
     created_at: z.string().nullable().optional(),
+    status: workoutSessionStatusSchema,
+    started_at: z.string().nullable(),
+    last_activity_at: z.string().nullable(),
+    finished_at: z.string().nullable(),
+    revision: z.number().int().min(0),
     total_duration_minutes: z.number(),
     exercises: z.array(exerciseEntryResponseSchema),
     exercise_snapshot: exerciseSnapshotResponseSchema.nullable().optional(),
     activity_details: z.array(activityDetailResponseSchema),
+  })
+  .strict();
+
+/** Request body for POST /exercise-preset-entries/:id/transition */
+export const workoutSessionTransitionRequestSchema = z
+  .object({
+    transition: workoutSessionTransitionSchema,
+    expected_revision: z.number().int().min(0).optional(),
   })
   .strict();
 
@@ -405,6 +434,13 @@ export type IndividualSessionResponse = z.infer<
   typeof individualSessionResponseSchema
 >;
 export type PresetSessionResponse = z.infer<typeof presetSessionResponseSchema>;
+export type WorkoutSessionStatus = z.infer<typeof workoutSessionStatusSchema>;
+export type WorkoutSessionTransition = z.infer<
+  typeof workoutSessionTransitionSchema
+>;
+export type WorkoutSessionTransitionRequest = z.infer<
+  typeof workoutSessionTransitionRequestSchema
+>;
 export type ExerciseSessionResponse = z.infer<
   typeof exerciseSessionResponseSchema
 >;

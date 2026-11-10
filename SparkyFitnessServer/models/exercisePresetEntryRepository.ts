@@ -2,7 +2,8 @@ import { getClient } from '../db/poolManager.js';
 import { log } from '../config/logging.js';
 const PRESET_ENTRY_SELECT = `
   SELECT id, user_id, workout_preset_id, name, description, entry_date, created_at,
-         updated_at, created_by_user_id, notes, source
+         updated_at, created_by_user_id, notes, source,
+         started_at, last_activity_at, finished_at, revision
   FROM exercise_preset_entries
 `;
 
