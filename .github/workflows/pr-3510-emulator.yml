@@ -21,7 +21,7 @@ env:
   SPARKY_FITNESS_APP_DB_PASSWORD: sparky-ci-pass
   SPARKY_FITNESS_SERVER_PORT: "3010"
   SPARKY_FITNESS_FRONTEND_URL: https://10.0.2.2:8443
-  SPARKY_FITNESS_API_ENCRYPTION_KEY: Y2ktZW5jcnlwdGlvbi1rZXktMzItYnl0ZXMh
+  SPARKY_FITNESS_API_ENCRYPTION_KEY: cHIzNTEwLWNpLWVuY3J5cHRpb24ta2V5LTAxMjM0NTY=
   BETTER_AUTH_SECRET: cHItMzUxMC1lbXVsYXRvci1zY3JlZW5zaG90cy1zZWNyZXQhIQ==
   SPARKY_FITNESS_LOG_LEVEL: ERROR
   SPARKY_FITNESS_DISABLE_SIGNUP: "false"
@@ -141,13 +141,13 @@ jobs:
           set -euo pipefail
           deadline=$((SECONDS + 2400))
           while :; do
-            STATUS="$(gh api repos/Dragonk/SparkyFitness/actions/runs/"$APK_RUN_ID$" --jq .status)"
+            STATUS="$(gh api repos/Dragonk/SparkyFitness/actions/runs/"$APK_RUN_ID" --jq .status)"
             echo "APK run status: $STATUS"
             if [ "$STATUS" = "completed" ]; then break; fi
             if [ $SECONDS -ge $deadline ]; then echo "::error::Timed out waiting for the APK build run"; exit 1; fi
             sleep 30
           done
-          CONCLUSION="$(gh api repos/Dragonk/SparkyFitness/actions/runs/"$APK_RUN_ID$" --jq .conclusion)"
+          CONCLUSION="$(gh api repos/Dragonk/SparkyFitness/actions/runs/"$APK_RUN_ID" --jq .conclusion)"
           if [ "$CONCLUSION" != "success" ]; then echo "::error::The APK build run concluded with $CONCLUSION"; exit 1; fi
       - name: Download the APK artifact
         uses: actions/download-artifact@v4
@@ -189,15 +189,18 @@ jobs:
             maestro --version
 
             cd ci/pr-3510
-            maestro test flow.yaml -e APP_ID=org.SparkyApps.SparkyFitnessMobile1.dev
+            maestro test flow.yaml -e APP_ID=org.SparkyApps.SparkyFitnessMobile1.dev -o "$GITHUB_WORKSPACE/maestro-out"
 
             mkdir -p "$GITHUB_WORKSPACE/screenshots"
-            cp -v *.png "$GITHUB_WORKSPACE/screenshots/" || true
+            find "$GITHUB_WORKSPACE/maestro-out" -name "*.png" | xargs -I{} cp -v {} "$GITHUB_WORKSPACE/screenshots/"
+
+            # screenshots land in maestro-out via -o
 
       - name: Always collect screenshots and logs
         if: always()
         run: |
           mkdir -p screenshots
+          if [ -d maestro-out ]; then find maestro-out -name "*.png" | xargs -I{} cp -v {} screenshots/; fi
           if [ -d ci/pr-3510 ]; then cp -v ci/pr-3510/*.png screenshots/ 2>/dev/null || true; fi
           ls -la screenshots || true
 
