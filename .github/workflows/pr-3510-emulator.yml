@@ -134,6 +134,21 @@ jobs:
           echo "APK_RUN_ID=$APK_RUN_ID" >> "$GITHUB_ENV"
           echo "Using APK from run $APK_RUN_ID"
 
+      - name: Wait for the APK build run to finish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 2400))
+          while :; do
+            STATUS="$(gh api repos/Dragonk/SparkyFitness/actions/runs/"$APK_RUN_ID$" --jq .status)"
+            echo "APK run status: $STATUS"
+            if [ "$STATUS" = "completed" ]; then break; fi
+            if [ $SECONDS -ge $deadline ]; then echo "::error::Timed out waiting for the APK build run"; exit 1; fi
+            sleep 30
+          done
+          CONCLUSION="$(gh api repos/Dragonk/SparkyFitness/actions/runs/"$APK_RUN_ID$" --jq .conclusion)"
+          if [ "$CONCLUSION" != "success" ]; then echo "::error::The APK build run concluded with $CONCLUSION"; exit 1; fi
       - name: Download the APK artifact
         uses: actions/download-artifact@v4
         with:
