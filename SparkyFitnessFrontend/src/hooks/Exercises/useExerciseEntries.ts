@@ -13,6 +13,7 @@ import {
   createPresetSession,
   logWorkoutPreset,
   deleteExercisePresetEntry,
+  transitionWorkoutSession,
   fetchExerciseDetails,
   fetchExerciseEntryHistoryV2,
   getExerciseHistory,
@@ -20,7 +21,10 @@ import {
 import { exerciseEntryKeys, exerciseKeys } from '@/api/keys/exercises';
 import i18n from '@/i18n';
 import { dailyProgressKeys } from '@/api/keys/diary';
-import { UpdateExerciseEntryRequest } from '@workspace/shared';
+import {
+  UpdateExerciseEntryRequest,
+  WorkoutSessionTransition,
+} from '@workspace/shared';
 import { useDiaryInvalidation } from '../useInvalidateKeys';
 
 // --- Queries ---
@@ -199,6 +203,37 @@ export const useDeleteExercisePresetEntryMutation = () => {
       errorMessage: t(
         'diary.exerciseEntry.deletePresetError',
         'Failed to delete preset entry.'
+      ),
+    },
+  });
+};
+
+export const useWorkoutSessionTransitionMutation = () => {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: (variables: {
+      presetEntryId: string;
+      transition: WorkoutSessionTransition;
+      expectedRevision?: number;
+    }) =>
+      transitionWorkoutSession(variables.presetEntryId, {
+        transition: variables.transition,
+        expected_revision: variables.expectedRevision,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: exerciseEntryKeys.all });
+      queryClient.invalidateQueries({ queryKey: dailyProgressKeys.all });
+    },
+    meta: {
+      successMessage: t(
+        'diary.exerciseEntry.transitionSuccess',
+        'Workout status updated.'
+      ),
+      errorMessage: t(
+        'diary.exerciseEntry.transitionError',
+        'Failed to update workout status.'
       ),
     },
   });

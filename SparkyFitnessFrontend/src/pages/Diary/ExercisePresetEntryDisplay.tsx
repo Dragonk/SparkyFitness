@@ -16,8 +16,13 @@ import {
   Clock,
   Activity,
   Layers,
+  Play,
+  RotateCcw,
+  Square,
 } from 'lucide-react';
 import ExerciseEntryDisplay from './ExerciseEntryDisplay';
+import WorkoutSessionStatusBadge from '@/components/WorkoutSessionStatusBadge';
+import type { WorkoutSessionTransition } from '@workspace/shared';
 import { formatMinutesToHHMM } from '@/utils/timeFormatters';
 import { Exercise, ExerciseEntry, PresetSessionEntry } from '@/types/exercises';
 import {
@@ -35,6 +40,11 @@ interface ExercisePresetEntryDisplayProps {
   handleEditExerciseDatabase: (exerciseId: string) => void;
   setExerciseToPlay: (exercise: Exercise | null) => void;
   setIsPlaybackModalOpen: (isOpen: boolean) => void;
+  onTransition?: (
+    presetEntryId: string,
+    transition: WorkoutSessionTransition,
+    expectedRevision?: number
+  ) => void;
   energyUnit: 'kcal' | 'kJ';
   convertEnergy: (
     value: number,
@@ -53,6 +63,7 @@ const ExercisePresetEntryDisplay: React.FC<ExercisePresetEntryDisplayProps> = ({
   handleEditExerciseDatabase,
   setExerciseToPlay,
   setIsPlaybackModalOpen,
+  onTransition,
   energyUnit,
   convertEnergy,
   getEnergyUnitString,
@@ -152,6 +163,9 @@ const ExercisePresetEntryDisplay: React.FC<ExercisePresetEntryDisplayProps> = ({
                       {exerciseCount === 1 ? 'exercise' : 'exercises'}
                     </span>
                   )}
+                  {presetEntry.status && (
+                    <WorkoutSessionStatusBadge status={presetEntry.status} />
+                  )}
                 </div>
                 {presetEntry.exercise_snapshot?.category && (
                   <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 dark:text-gray-500 mt-0.5">
@@ -161,26 +175,70 @@ const ExercisePresetEntryDisplay: React.FC<ExercisePresetEntryDisplayProps> = ({
               </div>
             </button>
 
-            {/* Right: delete */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(presetEntry.id)}
-                    className="flex-shrink-0 h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>
-                    {t('exerciseCard.deletePresetEntry', 'Delete Preset Entry')}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* Right: lifecycle actions + delete */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {onTransition && presetEntry.status === 'planned' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    onTransition(presetEntry.id, 'start', presetEntry.revision)
+                  }
+                  className="h-8 gap-1 text-xs"
+                >
+                  <Play className="w-3 h-3" />
+                  {t('workoutSessionActions.start', 'Start')}
+                </Button>
+              )}
+              {onTransition && presetEntry.status === 'partial' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    onTransition(presetEntry.id, 'resume', presetEntry.revision)
+                  }
+                  className="h-8 gap-1 text-xs"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  {t('workoutSessionActions.resume', 'Resume Workout')}
+                </Button>
+              )}
+              {onTransition && presetEntry.status === 'in_progress' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    onTransition(presetEntry.id, 'end', presetEntry.revision)
+                  }
+                  className="h-8 gap-1 text-xs"
+                >
+                  <Square className="w-3 h-3" />
+                  {t('workoutSessionActions.end', 'End')}
+                </Button>
+              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(presetEntry.id)}
+                      className="flex-shrink-0 h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {t(
+                        'exerciseCard.deletePresetEntry',
+                        'Delete Preset Entry'
+                      )}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
 
           {/* Description / notes */}

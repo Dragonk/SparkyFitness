@@ -15,6 +15,8 @@ import {
   ExerciseProgressResponse,
   exerciseSnapshotResponseSchema,
   ExerciseSnapshotResponse,
+  PresetSessionResponse,
+  WorkoutSessionTransitionRequest,
 } from '@workspace/shared';
 import z from 'zod';
 import { parseJsonArray } from './exerciseService';
@@ -131,6 +133,17 @@ export const deleteExercisePresetEntry = async (
 ): Promise<void> => {
   return apiCall(`/exercise-preset-entries/${presetEntryId}`, {
     method: 'DELETE',
+  });
+};
+
+export const transitionWorkoutSession = async (
+  presetEntryId: string,
+  payload: WorkoutSessionTransitionRequest
+): Promise<PresetSessionResponse> => {
+  return apiCall(`/exercise-preset-entries/${presetEntryId}/transition`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
   });
 };
 

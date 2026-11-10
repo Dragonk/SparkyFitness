@@ -32,6 +32,7 @@ import {
   useDeleteExerciseEntryMutation,
   useDeleteExercisePresetEntryMutation,
   useExerciseEntries,
+  useWorkoutSessionTransitionMutation,
 } from '@/hooks/Exercises/useExerciseEntries';
 import {
   resolveExerciseCalories,
@@ -103,6 +104,8 @@ const ExerciseCard = ({
   const { mutateAsync: deleteExerciseEntry } = useDeleteExerciseEntryMutation();
   const { mutateAsync: deleteExercisePresetEntry } =
     useDeleteExercisePresetEntryMutation();
+  const { mutateAsync: transitionWorkoutSession } =
+    useWorkoutSessionTransitionMutation();
   const { data: exerciseEntries, isLoading: loading } = useExerciseEntries(
     selectedDate,
     currentUserId
@@ -261,6 +264,22 @@ const ExerciseCard = ({
       );
     } catch (err) {
       error(loggingLevel, 'Error deleting exercise preset entry:', err);
+    }
+  };
+
+  const handleWorkoutSessionTransition = async (
+    presetEntryId: string,
+    transition: 'start' | 'resume' | 'end',
+    expectedRevision?: number
+  ) => {
+    try {
+      await transitionWorkoutSession({
+        presetEntryId,
+        transition,
+        expectedRevision,
+      });
+    } catch (err) {
+      error(loggingLevel, 'Error transitioning workout session:', err);
     }
   };
 
@@ -471,6 +490,7 @@ const ExerciseCard = ({
                     handleEditExerciseDatabase={handleEditExerciseDatabase}
                     setExerciseToPlay={setExerciseToPlay}
                     setIsPlaybackModalOpen={setIsPlaybackModalOpen}
+                    onTransition={handleWorkoutSessionTransition}
                     energyUnit={energyUnit}
                     convertEnergy={convertEnergy}
                     getEnergyUnitString={getEnergyUnitString}
