@@ -7,11 +7,16 @@
  *   pnpm exec tsx ci/pr-3510/seed.ts
  */
 const BASE = process.env.SEED_BASE_URL ?? 'http://127.0.0.1:3010';
+const ORIGIN = process.env.SEED_ORIGIN ?? 'https://10.0.2.2:8443';
 const EMAIL = 'demo@example.com';
 const PASSWORD = 'SparkyDemo2026!';
 
 async function api(path: string, init?: RequestInit): Promise<any> {
-  const res = await fetch(BASE + path, init);
+  // Better Auth refuses auth POSTs without an Origin; send the CI
+  // frontend origin the server already trusts via SPARKY_FITNESS_FRONTEND_URL.
+  const headers = new Headers(init?.headers);
+  headers.set('Origin', ORIGIN);
+  const res = await fetch(BASE + path, { ...init, headers });
   const text = await res.text();
   if (!res.ok) {
     throw new Error(path + ' -> ' + res.status + ': ' + text.slice(0, 400));
