@@ -1,12 +1,12 @@
 name: PR 3510 Emulator Screenshots
 
 on:
-  workflow_dispatch:
-    inputs:
-      apk_run_id:
-        description: "Run ID of the build-test-apk run that published the APK artifact"
-        required: true
-        type: string
+  push:
+    branches:
+      - ci/pr-3510-e2e
+    paths:
+      - .github/workflows/pr-3510-emulator.yml
+      - ci/pr-3510/**
 
 permissions:
   contents: read
@@ -124,10 +124,20 @@ jobs:
           echo
           echo "HTTPS front is up"
 
+      - name: Resolve the APK artifact run
+        run: |
+          set -euo pipefail
+          APK_RUN_ID="$(tr -d '[:space:]' < ci/pr-3510/apk_run_id.txt)"
+          case "$APK_RUN_ID" in
+            ''|*[!0-9]*) echo "::error::ci/pr-3510/apk_run_id.txt must contain a numeric run id"; exit 1;;
+          esac
+          echo "APK_RUN_ID=$APK_RUN_ID" >> "$GITHUB_ENV"
+          echo "Using APK from run $APK_RUN_ID"
+
       - name: Download the APK artifact
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ inputs.apk_run_id }}
+          run-id: ${{ env.APK_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: apk
 
