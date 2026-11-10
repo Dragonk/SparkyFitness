@@ -33,6 +33,10 @@ jest.mock('../../src/hooks/useExerciseMutations', () => {
       isPending: false,
       invalidateCache: jest.fn(),
     })),
+    useWorkoutSessionTransition: jest.fn(() => ({
+      transitionSessionAsync: jest.fn().mockResolvedValue(undefined),
+      isPending: false,
+    })),
   };
 });
 
