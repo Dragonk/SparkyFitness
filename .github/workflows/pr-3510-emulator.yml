@@ -126,14 +126,14 @@ jobs:
 
       - name: Resolve and wait for the matching APK build
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           # The APK is built from the phase branch by the push-triggered
           # pr-3510-apk workflow; wait until its artifact carries the current
           # phase head so the screenshots always match the branch tip.
           FEATURE_SHA="$(gh api repos/Dragonk/SparkyFitness/commits/feat/workout-session-lifecycle --jq .sha)"
-          SHORT="${{FEATURE_SHA:0:8}"
+          SHORT="${FEATURE_SHA:0:8}"
           echo "Phase head: $FEATURE_SHA (short $SHORT)"
           deadline=$((SECONDS + 2700))
           while :; do
