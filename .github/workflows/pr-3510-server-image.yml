@@ -5,11 +5,16 @@ name: PR 3510 Server Image
 # carries the session-lifecycle changes (#1995 phase 1).
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - ci/pr-3510-e2e
     paths:
       - .github/workflows/pr-3510-server-image.yml
+      - SparkyFitnessServer/**
+      - shared/**
+      - SparkyFitnessFrontend/**
+      - ci/pr-3510/**
 
 permissions:
   contents: read
