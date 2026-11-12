@@ -163,7 +163,8 @@ jobs:
           api-level: 30
           arch: x86_64
           target: google_apis
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -writable-system -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -writable-system -camera-back none -memory 3072
+          disable-animations: false
           script: bash ci/pr-3510/emulator-test.sh
 
       - name: Always collect screenshots and logs
