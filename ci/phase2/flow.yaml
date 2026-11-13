@@ -107,34 +107,27 @@ name: Phase 2 workout plan management screenshots
 - tapOn:
     text: "zz_probe_marker_never_matches"
     optional: true
-# The set inputs sit in one row: reps, weight, rest, right of the row
-# number. rightOf alone matches elements across the whole tree (the status
-# bar included), so also pin the candidates below the slot title.
 # The optional probe above never matches; its failure dump captures the
-# form hierarchy for the set row coordinates.
-# Do NOT hideKeyboard between the three inputs: hideKeyboard sends BACK and
-# pops the form when the IME already closed itself. The row stays above the
-# keyboard (adjustResize), so one hideKeyboard after the last input is enough.
+# form hierarchy with the set row coordinates.
+# The set inputs sit in one row (reps, weight, rest) at the coordinates
+# captured from the accessibility hierarchy on the 1080x1920 skin:
+# reps [59,1074][377,1116], weight [382,1074][700,1116], rest
+# [706,1074][1024,1116]. Selector combos (rightOf/below/index) matched the
+# reorder and remove buttons instead - their accessibility labels contain
+# the exercise name - so the flow moved the assignments around and even
+# removed the exercise from the draft. Tap the exact screen points instead.
+# Each tap focuses a real input, so the IME opens and hideKeyboard
+# (BACK) safely closes it between the fields.
 - tapOn:
-    rightOf:
-      text: '1\.'
-    below:
-      text: "Demo Goblet Squat"
-    index: 0
+    point: "20%, 57%"
 - inputText: "12"
+- hideKeyboard
 - tapOn:
-    rightOf:
-      text: '1\.'
-    below:
-      text: "Demo Goblet Squat"
-    index: 1
+    point: "50%, 57%"
 - inputText: "20"
+- hideKeyboard
 - tapOn:
-    rightOf:
-      text: '1\.'
-    below:
-      text: "Demo Goblet Squat"
-    index: 2
+    point: "80%, 57%"
 - inputText: "90"
 - hideKeyboard
 - takeScreenshot: 09_set_filled
