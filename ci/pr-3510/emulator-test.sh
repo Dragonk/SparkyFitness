@@ -122,7 +122,7 @@ export PATH="$HOME/.maestro/bin:$PATH"
 maestro --version
 
 cd ci/pr-3510
-maestro test flow.yaml -e APP_ID=org.SparkyApps.SparkyFitnessMobile1.dev -o "$GITHUB_WORKSPACE/maestro-out"
+MAESTRO_CLI_NO_ANALYTICS=1 maestro test flow.yaml -e APP_ID=org.SparkyApps.SparkyFitnessMobile1.dev --output "$GITHUB_WORKSPACE/maestro-out"
 
 mkdir -p "$GITHUB_WORKSPACE/screenshots"
 find "$GITHUB_WORKSPACE/maestro-out" -name "*.png" | xargs -I{} cp -v {} "$GITHUB_WORKSPACE/screenshots/"
