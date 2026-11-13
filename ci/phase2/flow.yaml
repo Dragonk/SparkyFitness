@@ -112,6 +112,9 @@ name: Phase 2 workout plan management screenshots
 # bar included), so also pin the candidates below the slot title.
 # The optional probe above never matches; its failure dump captures the
 # form hierarchy for the set row coordinates.
+# Do NOT hideKeyboard between the three inputs: hideKeyboard sends BACK and
+# pops the form when the IME already closed itself. The row stays above the
+# keyboard (adjustResize), so one hideKeyboard after the last input is enough.
 - tapOn:
     rightOf:
       text: '1\.'
@@ -119,7 +122,6 @@ name: Phase 2 workout plan management screenshots
       text: "Demo Goblet Squat"
     index: 0
 - inputText: "12"
-- hideKeyboard
 - tapOn:
     rightOf:
       text: '1\.'
@@ -127,7 +129,6 @@ name: Phase 2 workout plan management screenshots
       text: "Demo Goblet Squat"
     index: 1
 - inputText: "20"
-- hideKeyboard
 - tapOn:
     rightOf:
       text: '1\.'
