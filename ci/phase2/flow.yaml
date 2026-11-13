@@ -104,22 +104,35 @@ name: Phase 2 workout plan management screenshots
     visible: "Add set"
     timeout: 45000
 - takeScreenshot: 08_form_exercise_added
-# The set inputs sit in one row: reps, weight, rest, right of the row number.
+- tapOn:
+    text: "zz_probe_marker_never_matches"
+    optional: true
+# The set inputs sit in one row: reps, weight, rest, right of the row
+# number. rightOf alone matches elements across the whole tree (the status
+# bar included), so also pin the candidates below the slot title.
+# The optional probe above never matches; its failure dump captures the
+# form hierarchy for the set row coordinates.
 - tapOn:
     rightOf:
       text: '1\.'
+    below:
+      text: "Demo Goblet Squat"
     index: 0
 - inputText: "12"
 - hideKeyboard
 - tapOn:
     rightOf:
       text: '1\.'
+    below:
+      text: "Demo Goblet Squat"
     index: 1
 - inputText: "20"
 - hideKeyboard
 - tapOn:
     rightOf:
       text: '1\.'
+    below:
+      text: "Demo Goblet Squat"
     index: 2
 - inputText: "90"
 - hideKeyboard
