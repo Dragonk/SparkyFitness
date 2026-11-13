@@ -107,19 +107,19 @@ name: Phase 2 workout plan management screenshots
 # The set inputs sit in one row: reps, weight, rest, right of the row number.
 - tapOn:
     rightOf:
-      text: "1\."
+      text: '1\.'
     index: 0
 - inputText: "12"
 - hideKeyboard
 - tapOn:
     rightOf:
-      text: "1\."
+      text: '1\.'
     index: 1
 - inputText: "20"
 - hideKeyboard
 - tapOn:
     rightOf:
-      text: "1\."
+      text: '1\.'
     index: 2
 - inputText: "90"
 - hideKeyboard
