@@ -1,28 +1,30 @@
 appId: ${APP_ID}
 name: PR 3510 session lifecycle screenshots
 ---
-# First launch: enter the frontend URL that fronts the API.
+# The URL input exposes only a paste affordance to accessibility (its hint is
+# not in the tree), so seed the clipboard and paste instead of typing.
 - launchApp:
     appId: ${APP_ID}
     clearState: true
 - extendedWaitUntil:
-    visible: "https://your-sparky-app.com"
+    visible: "Frontend URL"
     timeout: 90000
 - takeScreenshot: 01_onboarding
-- tapOn:
-    text: "https://your-sparky-app.com"
-- inputText: "https://10.0.2.2:8443"
-- hideKeyboard
+- setClipboard: "https://10.0.2.2:8443"
+- tapOn: "Paste URL from clipboard"
 - tapOn: "Next"
 - extendedWaitUntil:
-    visible: "email@example.com"
+    visible: "Connect to SparkyFitness"
     timeout: 45000
 - takeScreenshot: 02_sign_in
+# Email and Password inputs sit right below their static labels.
 - tapOn:
-    text: "email@example.com"
+    below:
+      text: "Email"
 - inputText: "demo@example.com"
 - tapOn:
-    text: "Password"
+    below:
+      text: "Password"
 - inputText: "SparkyDemo2026!"
 - hideKeyboard
 - tapOn: "Connect"
@@ -30,7 +32,7 @@ name: PR 3510 session lifecycle screenshots
     visible: "Diary"
     timeout: 90000
 - takeScreenshot: 03_after_login
-# Diary: three sessions with their derived status pills.
+# Diary: sessions with their derived status pills.
 - tapOn:
     text: "Diary"
     index: 1
@@ -55,4 +57,3 @@ name: PR 3510 session lifecycle screenshots
     visible: "Demo Goblet Squat"
     timeout: 60000
 - takeScreenshot: 06_active_workout_resumed
-

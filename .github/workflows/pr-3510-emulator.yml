@@ -180,6 +180,7 @@ jobs:
         if: always()
         run: |
           mkdir -p screenshots
+          if [ -d "$HOME/.maestro/tests" ]; then find "$HOME/.maestro/tests" -type f | xargs -I{} cp -v {} screenshots/; fi
           if [ -d maestro-out ]; then find maestro-out -name "*.png" | xargs -I{} cp -v {} screenshots/; fi
           if [ -d ci/pr-3510 ]; then cp -v ci/pr-3510/*.png screenshots/ 2>/dev/null || true; fi
           ls -la screenshots || true
