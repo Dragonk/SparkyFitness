@@ -35,14 +35,18 @@ name: PR 3510 session lifecycle screenshots
 - hideKeyboard
 - takeScreenshot: 02_sign_in_filled
 - tapOn: "Connect"
+# Fresh installs show a one-time announcement over the dashboard.
+- extendedWaitUntil:
+    visible: "Android App - Github APK!"
+    timeout: 45000
+- takeScreenshot: 02_announcement
+- tapOn: "Got it, don't show again"
 - extendedWaitUntil:
     visible: "Diary"
     timeout: 90000
 - takeScreenshot: 03_after_login
 # Diary: sessions with their derived status pills.
-- tapOn:
-    text: "Diary"
-    index: 1
+- tapOn: "Diary"
 - extendedWaitUntil:
     visible: "Phase 1 Partial Workout"
     timeout: 45000
