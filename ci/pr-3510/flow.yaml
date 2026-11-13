@@ -1,18 +1,20 @@
 appId: ${APP_ID}
 name: PR 3510 session lifecycle screenshots
 ---
-# The URL input exposes only a paste affordance to accessibility (its hint is
-# not in the tree), so seed the clipboard and paste instead of typing.
 - launchApp:
     appId: ${APP_ID}
     clearState: true
 - extendedWaitUntil:
     visible: "Frontend URL"
     timeout: 90000
-- takeScreenshot: 01_onboarding
-- setClipboard: "https://10.0.2.2:8443"
-- tapOn: "Paste URL from clipboard"
+# The URL input sits directly below its label, ahead of the paste button.
+- tapOn:
+    below:
+      text: "Frontend URL"
+    index: 0
+- inputText: "https://10.0.2.2:8443"
 - hideKeyboard
+- takeScreenshot: 01_onboarding
 - tapOn: "Next"
 - extendedWaitUntil:
     visible: "Connect to SparkyFitness"
@@ -22,13 +24,16 @@ name: PR 3510 session lifecycle screenshots
 - tapOn:
     below:
       text: "Email"
+    index: 0
 - inputText: "demo@example.com"
 - hideKeyboard
 - tapOn:
     below:
       text: "Password"
+    index: 0
 - inputText: "SparkyDemo2026!"
 - hideKeyboard
+- takeScreenshot: 02_sign_in_filled
 - tapOn: "Connect"
 - extendedWaitUntil:
     visible: "Diary"
