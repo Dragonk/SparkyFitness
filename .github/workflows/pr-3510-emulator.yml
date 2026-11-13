@@ -140,7 +140,7 @@ jobs:
             for RID in $(gh api "repos/Dragonk/SparkyFitness/actions/workflows/pr-3510-apk.yml/runs?status=success&per_page=10" --jq '.workflow_runs[].id'); do
               NAME="$(gh api repos/Dragonk/SparkyFitness/actions/runs/$RID/artifacts --jq '.artifacts[0].name')"
               echo "run $RID artifact: $NAME"
-              if [ "$NAME" = "SparkyFitness-$SHORT-dev-release" ]; then
+              if [ "$NAME" = "SparkyFitness-$SHORT-dev-release-dualabi" ]; then
                 echo "APK_RUN_ID=$RID" >> "$GITHUB_ENV"
                 echo "Using APK from run $RID"
                 exit 0
