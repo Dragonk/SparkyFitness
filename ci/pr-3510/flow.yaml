@@ -12,6 +12,7 @@ name: PR 3510 session lifecycle screenshots
 - takeScreenshot: 01_onboarding
 - setClipboard: "https://10.0.2.2:8443"
 - tapOn: "Paste URL from clipboard"
+- hideKeyboard
 - tapOn: "Next"
 - extendedWaitUntil:
     visible: "Connect to SparkyFitness"
@@ -22,6 +23,7 @@ name: PR 3510 session lifecycle screenshots
     below:
       text: "Email"
 - inputText: "demo@example.com"
+- hideKeyboard
 - tapOn:
     below:
       text: "Password"
