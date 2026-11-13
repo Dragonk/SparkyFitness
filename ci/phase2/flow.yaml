@@ -89,9 +89,16 @@ name: Phase 2 workout plan management screenshots
     timeout: 30000
     visibilityPercentage: 80
 - tapOn: "Add exercise"
+# The search field has no text Maestro can match (placeholders are
+# invisible), so tap it by position: the EditText sits just under the
+# Search/Online tab row (bounds captured from a debug dump).
+- tapOn:
+    point: "51%, 8%"
+- inputText: "Demo Goblet"
+- hideKeyboard
 - extendedWaitUntil:
     visible: "Demo Goblet Squat"
-    timeout: 60000
+    timeout: 45000
 - tapOn: "Demo Goblet Squat"
 - extendedWaitUntil:
     visible: "Add set"
