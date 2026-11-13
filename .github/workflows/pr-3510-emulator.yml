@@ -68,6 +68,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Keep the upstream announcement modal out of the screenshots
+        # The server proxies the upstream announcement feed; pointing its
+        # host at loopback makes the fetch fail so the app never shows the
+        # full-screen announcement modal over the demo screens.
+        run: echo "127.0.0.1 raw.githubusercontent.com" | sudo tee -a /etc/hosts
+
       - name: Start the API server
         working-directory: SparkyFitnessServer
         run: |

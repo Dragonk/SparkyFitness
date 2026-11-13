@@ -35,12 +35,8 @@ name: PR 3510 session lifecycle screenshots
 - hideKeyboard
 - takeScreenshot: 02_sign_in_filled
 - tapOn: "Connect"
-# Fresh installs show a one-time announcement over the dashboard.
-- extendedWaitUntil:
-    visible: "Android App - Github APK!"
-    timeout: 150000
-- takeScreenshot: 02_announcement
-- tapOn: "Got it, don't show again"
+# The CI server cannot reach the upstream announcement feed, so no
+# full-screen announcement modal appears after sign in.
 - extendedWaitUntil:
     visible: "Diary"
     timeout: 90000
