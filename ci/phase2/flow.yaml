@@ -1,0 +1,146 @@
+appId: ${APP_ID}
+name: Phase 2 workout plan management screenshots
+---
+- launchApp:
+    appId: ${APP_ID}
+    clearState: true
+- extendedWaitUntil:
+    visible: "Frontend URL"
+    timeout: 90000
+# The URL input sits directly below its label, ahead of the paste button.
+- tapOn:
+    below:
+      text: "Frontend URL"
+    index: 0
+- inputText: "https://10.0.2.2:8443"
+- hideKeyboard
+- takeScreenshot: 01_onboarding
+- tapOn: "Next"
+- extendedWaitUntil:
+    visible: "Connect to SparkyFitness"
+    timeout: 45000
+- takeScreenshot: 02_sign_in
+# Email and Password inputs sit right below their static labels.
+- tapOn:
+    below:
+      text: "Email"
+    index: 0
+- inputText: "demo@example.com"
+- hideKeyboard
+- tapOn:
+    below:
+      text: "Password"
+    index: 0
+- inputText: "SparkyDemo2026!"
+- hideKeyboard
+- takeScreenshot: 02_sign_in_filled
+- tapOn: "Connect"
+- extendedWaitUntil:
+    visible: "Diary"
+    timeout: 90000
+- takeScreenshot: 03_after_login
+# The workout plans entry lives in the Library tab.
+- tapOn: "Library"
+- extendedWaitUntil:
+    visible: "Workout plans"
+    timeout: 45000
+- takeScreenshot: 04_library
+- tapOn: "Workout plans"
+- extendedWaitUntil:
+    visible: "Phase 2 Weekly Plan"
+    timeout: 45000
+- takeScreenshot: 05_plans_list
+# Detail: day section, assignments, set summaries, activation switch.
+- tapOn: "Phase 2 Weekly Plan"
+- extendedWaitUntil:
+    visible: "Active plan"
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      text: "Phase 2 Push Day"
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 80
+- takeScreenshot: 06_plan_detail
+# Deactivate through the detail switch. index 1 skips the 'Active plan'
+# title text that sits in the same row.
+- scrollUntilVisible:
+    element:
+      text: "Active plan"
+    direction: UP
+    timeout: 30000
+    visibilityPercentage: 80
+- tapOn:
+    text: "Active plan"
+    index: 1
+- extendedWaitUntil:
+    visible: "Plan deactivated"
+    timeout: 30000
+- takeScreenshot: 07_plan_deactivated
+# Edit the plan: add a single exercise with its own sets.
+- tapOn: "Edit workout plan"
+- extendedWaitUntil:
+    visible: "Add exercise"
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      text: "Add exercise"
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 80
+- tapOn: "Add exercise"
+- extendedWaitUntil:
+    visible: "Demo Goblet Squat"
+    timeout: 60000
+- tapOn: "Demo Goblet Squat"
+- extendedWaitUntil:
+    visible: "Add set"
+    timeout: 45000
+- takeScreenshot: 08_form_exercise_added
+# The set inputs sit in one row: reps, weight, rest, right of the row number.
+- tapOn:
+    rightOf:
+      text: "1."
+    index: 0
+- inputText: "12"
+- hideKeyboard
+- tapOn:
+    rightOf:
+      text: "1."
+    index: 1
+- inputText: "20"
+- hideKeyboard
+- tapOn:
+    rightOf:
+      text: "1."
+    index: 2
+- inputText: "90"
+- hideKeyboard
+- takeScreenshot: 09_set_filled
+# Save; the plan is inactive for now, so nothing regenerates yet.
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "Active plan"
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      text: "Demo Goblet Squat"
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 80
+- takeScreenshot: 10_detail_after_edit
+# Reactivate: the server regenerates the upcoming planned sessions.
+- scrollUntilVisible:
+    element:
+      text: "Active plan"
+    direction: UP
+    timeout: 30000
+    visibilityPercentage: 80
+- tapOn:
+    text: "Active plan"
+    index: 1
+- extendedWaitUntil:
+    visible: "Plan activated"
+    timeout: 30000
+- takeScreenshot: 11_reactivated
+

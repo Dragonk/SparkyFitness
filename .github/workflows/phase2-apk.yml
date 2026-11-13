@@ -1,0 +1,286 @@
+name: Phase 2 APK
+
+on:
+  push:
+    branches:
+      - ci/phase2-e2e
+
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    permissions:
+      contents: read
+
+    env:
+      NODE_ENV: production
+      APP_VARIANT: dev
+
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: feat/workout-plan-mobile-management
+          fetch-depth: 0
+
+      - name: Verify checked-out revision
+        id: revision
+        shell: bash
+        env:
+          REQUESTED_REF: feat/workout-plan-mobile-management
+          EXPECTED_SHA: ""
+        run: |
+          set -euo pipefail
+
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          SHORT_SHA="${ACTUAL_SHA:0:8}"
+
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+          echo "Requested ref: $REQUESTED_REF"
+          echo "Actual SHA:    $ACTUAL_SHA"
+
+          if [[ -n "$EXPECTED_SHA" && "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Checked-out SHA does not match expected_sha."
+            echo "::error::Expected: $EXPECTED_SHA"
+            echo "::error::Actual:   $ACTUAL_SHA"
+            exit 1
+          fi
+
+          if [[ -n "$EXPECTED_SHA" ]]; then
+            echo "Exact SHA guard passed."
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Expo Android prebuild
+        working-directory: SparkyFitnessMobile
+        run: |
+          set -euo pipefail
+          echo "APP_VARIANT=$APP_VARIANT"
+          npx expo prebuild --platform android
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x SparkyFitnessMobile/android/gradlew
+
+      - name: Create Android local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > SparkyFitnessMobile/android/local.properties
+
+      - name: Configure Gradle memory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/.gradle"
+
+          cat > "$HOME/.gradle/gradle.properties" <<'EOP'
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
+          org.gradle.workers.max=2
+          org.gradle.parallel=false
+          EOP
+
+          echo "GitHub Actions Gradle configuration:"
+          cat "$HOME/.gradle/gradle.properties"
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Generate temporary test keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/sparky-test.keystore" \
+            -alias sparky-test \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -storepass sparky-test-password \
+            -keypass sparky-test-password \
+            -dname "CN=SparkyFitness Test,O=Dragonk,C=PL"
+
+          test -f "$RUNNER_TEMP/sparky-test.keystore"
+
+      - name: Generate AsyncStorage codegen
+        working-directory: SparkyFitnessMobile/android
+        run: |
+          set -euo pipefail
+
+          ./gradlew \
+            :react-native-async-storage_async-storage:generateCodegenArtifactsFromSchema \
+            --no-daemon \
+            --stacktrace
+
+      - name: Verify AsyncStorage codegen
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CODEGEN_DIR="SparkyFitnessMobile/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni"
+
+          if [[ ! -d "$CODEGEN_DIR" ]]; then
+            echo "::error::AsyncStorage codegen directory was not generated."
+            exit 1
+          fi
+
+          echo "AsyncStorage codegen exists:"
+          ls -la "$CODEGEN_DIR"
+
+      - name: Build Release APK
+        working-directory: SparkyFitnessMobile/android
+        run: |
+          set -euo pipefail
+
+          ./gradlew :app:assembleRelease \
+            -PreactNativeArchitectures=arm64-v8a,x86_64 \
+            -PMYAPP_RELEASE_STORE_FILE="$RUNNER_TEMP/sparky-test.keystore" \
+            -PMYAPP_RELEASE_KEY_ALIAS=sparky-test \
+            -PMYAPP_RELEASE_STORE_PASSWORD=sparky-test-password \
+            -PMYAPP_RELEASE_KEY_PASSWORD=sparky-test-password \
+            --no-daemon \
+            --stacktrace
+
+      - name: Locate release APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK_PATH="$(
+            find SparkyFitnessMobile/android/app/build/outputs/apk/release \
+              -type f \
+              -name "*.apk" \
+              | head -n 1
+          )"
+
+          if [[ -z "$APK_PATH" || ! -f "$APK_PATH" ]]; then
+            echo "::error::No release APK found."
+            exit 1
+          fi
+
+          echo "source_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "Generated APK:"
+          ls -lh "$APK_PATH"
+
+      - name: Rename APK
+        id: output
+        shell: bash
+        env:
+          REQUESTED_REF: feat/workout-plan-mobile-management
+          APP_VARIANT_INPUT: dev
+        run: |
+          set -euo pipefail
+
+          SOURCE="${{ steps.apk.outputs.source_path }}"
+          SHORT_SHA="${{ steps.revision.outputs.short_sha }}"
+          VARIANT="$APP_VARIANT_INPUT"
+
+          if [[ "$REQUESTED_REF" == "feat/mobile-custom-measurements" ]]; then
+            FILE_NAME="SparkyFitness-PR2061-${SHORT_SHA}-${VARIANT}-release.apk"
+          else
+            SAFE_REF="$(printf '%s' "$REQUESTED_REF" | tr '/:' '--')"
+            FILE_NAME="SparkyFitness-${SAFE_REF}-${SHORT_SHA}-${VARIANT}-release.apk"
+          fi
+
+          OUTPUT_DIR="$RUNNER_TEMP/apk"
+          mkdir -p "$OUTPUT_DIR"
+
+          OUTPUT_PATH="$OUTPUT_DIR/$FILE_NAME"
+          cp "$SOURCE" "$OUTPUT_PATH"
+
+          SHA256="$(sha256sum "$OUTPUT_PATH" | awk '{print $1}')"
+
+          echo "name=$FILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "path=$OUTPUT_PATH" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+          echo "APK: $FILE_NAME"
+          echo "SHA256: $SHA256"
+          ls -lh "$OUTPUT_PATH"
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK="${{ steps.output.outputs.path }}"
+
+          if command -v apksigner >/dev/null 2>&1; then
+            apksigner verify --verbose "$APK"
+          else
+            echo "apksigner not available in PATH; skipping additional signature verification."
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SparkyFitness-${{ steps.revision.outputs.short_sha }}-dev-release-dualabi
+          path: ${{ steps.output.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Write build summary
+        shell: bash
+        env:
+          APP_VARIANT_INPUT: dev
+          REQUESTED_REF: feat/workout-plan-mobile-management
+        run: |
+          set -euo pipefail
+
+          if [[ "$APP_VARIANT_INPUT" == "dev" ]]; then
+            PACKAGE_ID="org.SparkyApps.SparkyFitnessMobile1.dev"
+          else
+            PACKAGE_ID="com.SparkyApps.SparkyFitnessMobile"
+          fi
+
+          {
+            echo "## SparkyFitness Android test build"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Requested ref | \`$REQUESTED_REF\` |"
+            echo "| Actual commit | \`${{ steps.revision.outputs.sha }}\` |"
+            echo "| App variant | \`$APP_VARIANT_INPUT\` |"
+            echo "| Gradle build type | \`release\` |"
+            echo "| Native architecture | \`arm64-v8a\` |"
+            echo "| Android package | \`$PACKAGE_ID\` |"
+            echo "| APK | \`${{ steps.output.outputs.name }}\` |"
+            echo "| SHA256 | \`${{ steps.output.outputs.sha256 }}\` |"
+            echo "| Signing | Temporary test keystore |"
+            echo "| Artifact retention | 14 days |"
+            echo
+            echo "The APK was built with \`:app:assembleRelease\`."
+          } >> "$GITHUB_STEP_SUMMARY"
