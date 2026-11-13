@@ -125,5 +125,10 @@ cd ci/pr-3510
 MAESTRO_CLI_NO_ANALYTICS=1 maestro test flow.yaml -e APP_ID=org.SparkyApps.SparkyFitnessMobile1.dev --output "$GITHUB_WORKSPACE/maestro-out"
 
 mkdir -p "$GITHUB_WORKSPACE/screenshots"
-find "$GITHUB_WORKSPACE/maestro-out" -name "*.png" | xargs -I{} cp -v {} "$GITHUB_WORKSPACE/screenshots/"
+# Maestro only populates the --output dir when a command fails; on a
+# green flow the screenshots live under ~/.maestro/tests instead, so do
+# not fail the job when maestro-out does not exist.
+if [ -d "$GITHUB_WORKSPACE/maestro-out" ]; then
+  find "$GITHUB_WORKSPACE/maestro-out" -name "*.png" | xargs -I{} cp -v {} "$GITHUB_WORKSPACE/screenshots/"
+fi
 
