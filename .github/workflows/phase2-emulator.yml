@@ -141,9 +141,9 @@ jobs:
           FEATURE_SHA="$(gh api repos/Dragonk/SparkyFitness/commits/feat/workout-plan-mobile-management --jq .sha)"
           SHORT="${FEATURE_SHA:0:8}"
           echo "Phase head: $FEATURE_SHA (short $SHORT)"
-          # The mobile code changed in b3b09013, so only an APK built from the
+          # The mobile code changed in c05ff7fe, so only an APK built from the
           # current head is acceptable; keep the fallback equal to the head.
-          FALLBACK_SHORT="b3b09013"
+          FALLBACK_SHORT="c05ff7fe"
           deadline=$((SECONDS + 2700))
           while :; do
             for RID in $(gh api "repos/Dragonk/SparkyFitness/actions/workflows/phase2-apk.yml/runs?status=success&per_page=10" --jq '.workflow_runs[].id'); do
