@@ -23,7 +23,7 @@ env:
   SPARKY_FITNESS_FRONTEND_URL: https://10.0.2.2:8443
   SPARKY_FITNESS_API_ENCRYPTION_KEY: cHIzNTEwLWNpLWVuY3J5cHRpb24ta2V5LTAxMjM0NTY=
   BETTER_AUTH_SECRET: cHItMzUxMC1lbXVsYXRvci1zY3JlZW5zaG90cy1zZWNyZXQhIQ==
-  SPARKY_FITNESS_LOG_LEVEL: ERROR
+  SPARKY_FITNESS_LOG_LEVEL: INFO
   SPARKY_FITNESS_DISABLE_SIGNUP: "false"
   SPARKY_FITNESS_ADMIN_EMAIL: demo@example.com
 
@@ -193,6 +193,11 @@ jobs:
           if [ -d maestro-out ]; then find maestro-out -name "*.png" | xargs -I{} cp -v {} screenshots/; fi
           if [ -d ci/phase2 ]; then cp -v ci/phase2/*.png screenshots/ 2>/dev/null || true; fi
           ls -la screenshots || true
+          # Ground truth for the plan state after the flow: dump the plan
+          # templates straight from the API with the seeded demo account.
+          TOKEN="$(curl -s -X POST http://127.0.0.1:3010/api/auth/sign-in/email -H 'Origin: https://10.0.2.2:8443' -H 'Content-Type: application/json' -d '{"email":"demo@example.com","password":"SparkyDemo2026!"}' | jq -r .token)"
+          echo "--- plan templates after the flow ---"
+          curl -s http://127.0.0.1:3010/api/workout-plan-templates -H "Authorization: Bearer $TOKEN" | jq '.' || true
 
       - name: Upload screenshots
         if: always()
@@ -202,7 +207,7 @@ jobs:
           path: screenshots/
           retention-days: 14
 
-      - name: Dump server log on failure
-        if: failure()
-        run: tail -100 /tmp/server.log || true
+      - name: Dump server log
+        if: always()
+        run: tail -400 /tmp/server.log || true
 
