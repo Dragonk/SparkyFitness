@@ -5,7 +5,6 @@ name: PR 3510 session lifecycle screenshots
 - launchApp:
     appId: ${APP_ID}
     clearState: true
-    autoGrantPermissions: true
 - extendedWaitUntil:
     visible: "https://your-sparky-app.com"
     timeout: 90000
